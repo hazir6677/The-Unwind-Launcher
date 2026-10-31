@@ -9,14 +9,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Arrange files
         run: |
-          mv_to() { if [ -f "$1" ]; then mkdir -p "$(dirname "$2")"; mv "$1" "$2"; fi; }
-          mv_to MainActivity.kt app/src/main/java/com/unwind/launcher/MainActivity.kt
-          mv_to AndroidManifest.xml app/src/main/AndroidManifest.xml
-          mv_to app-build.gradle.kts app/build.gradle.kts
-          mv_to strings.xml app/src/main/res/values/strings.xml
-          mv_to themes.xml app/src/main/res/values/themes.xml
-          mv_to ic_banner.xml app/src/main/res/drawable/ic_banner.xml
-          mv_to wallpaper.jpg app/src/main/res/drawable-nodpi/wallpaper.jpg
+          J=app/src/main/java/com/unwind/launcher
+          R=app/src/main/res
+          mkdir -p $J $R/values $R/drawable $R/drawable-nodpi
+          for f in *.kt; do [ -f "$f" ] && mv "$f" $J/; done
+          for f in *.jpg; do [ -f "$f" ] && mv "$f" $R/drawable-nodpi/; done
+          [ -f AndroidManifest.xml ] && mv AndroidManifest.xml app/src/main/
+          [ -f app-build.gradle.kts ] && mv app-build.gradle.kts app/build.gradle.kts
+          [ -f strings.xml ] && mv strings.xml $R/values/
+          [ -f themes.xml ] && mv themes.xml $R/values/
+          [ -f ic_banner.xml ] && mv ic_banner.xml $R/drawable/
+          ls -R app | head -60
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

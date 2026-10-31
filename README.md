@@ -13,17 +13,6 @@ A calm, glassy home screen for Android TV. Frosted-glass rail, a time-aware gree
 - **Search and Settings shortcuts:** open the TV's own search and settings
 - **Custom wallpaper:** drop in your own image and rebuild
 
-## Get the APK
-
-You don't need Android Studio. GitHub builds the app for you.
-
-1. Open the **Actions** tab of this repo.
-2. Open the latest run of **Build APK**. A green check means it worked.
-3. Scroll to **Artifacts** at the bottom and download `unwind-launcher-apk`.
-4. Unzip it to get `app-debug.apk`.
-
-Pushing any change to the repo triggers a new build. You can also start one with **Run workflow**.
-
 ## Install on your TV
 
 1. Get `app-debug.apk` onto the TV (USB drive, a file-transfer app, or a cloud drive and the TV's browser).

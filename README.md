@@ -35,21 +35,6 @@ Crop out your account email and Wi-Fi name first.
 - **Remote friendly:** the D-pad always takes you back and forth between the dock, the top bar, and your apps.
 - **Home screen replacement:** can be set as the app the Home button opens (see below).
 
-## Quick start
-
-GitHub builds the app for you, so you don't need Android Studio.
-
-1. Open the **Actions** tab of this repo.
-2. Open the latest run of **Build APK**. A green check means it worked.
-3. Scroll to **Artifacts** and download `unwind-launcher-apk`.
-4. Unzip it. Inside are two APKs:
-   - `release/app-release.apk` is the **smoother** one. Install this one.
-   - `debug/app-debug.apk` is a backup if the release one ever misbehaves.
-5. Sideload it on your TV (USB drive, a file-transfer app, or a cloud drive), allow installs from unknown sources, and install.
-6. Open **Unwind** from your TV's app list.
-
-Every push starts a new build. You can also start one by hand with **Run workflow**.
-
 ## Make it your Home screen
 
 1. Press the **Home** button on your remote.

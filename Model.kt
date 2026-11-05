@@ -5,15 +5,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.cos
 import kotlin.math.sin
 
 enum class GlassStyle(val label: String, val blurb: String) {
-    Liquid("Liquid Glass", "Clear, bright edges"),
+    Liquid("Liquid Glass", "Refraction, fluid motion"),
     Normal("Normal", "Tinted, soft blur"),
     Frost("Frost Glass", "Heavy blur, milky"),
 }
@@ -27,7 +27,10 @@ enum class IconStyle(val label: String, val blurb: String) {
     Original("Original", "Full-color app icons"),
 }
 
-enum class Screen { Home, Apps, Edit, Search, Settings }
+/** Where the wallpaper comes from. */
+enum class WallSource { Stock, Bing, Custom }
+
+enum class Screen { Home, Apps, Edit, Search, Settings, Gallery }
 enum class Popup { None, Wifi, Inputs, Account }
 
 private val HexShape: Shape = GenericShape { size, _ ->
@@ -50,8 +53,15 @@ fun IconShape.toShape(): Shape = when (this) {
     IconShape.Hexagon -> HexShape
 }
 
-/** A wallpaper plus the colors the UI borrows from it. */
-class Wp(val key: String, val name: String, val accent: Color, val tint: Color, val dark: Color)
+/** A wallpaper plus the colors the UI borrows from it. luma = how bright the picture is (0 dark .. 1 bright). */
+class Wp(
+    val key: String,
+    val name: String,
+    val accent: Color,
+    val tint: Color,
+    val dark: Color,
+    val luma: Float = 0.45f,
+)
 
 val WALLPAPERS = listOf(
     Wp("wp_misty", "Misty Valley", Color(0xFFC5E1A5), Color(0xFF3E6B3C), Color(0xFF1E3322)),
@@ -64,6 +74,7 @@ val WALLPAPERS = listOf(
 
 data class LauncherSettings(
     val wallpaper: Int = 0,
+    val wallSource: WallSource = WallSource.Stock,
     val shape: IconShape = IconShape.Circle,
     val showNames: Boolean = true,
     val iconStyle: IconStyle = IconStyle.Themed,
@@ -78,6 +89,7 @@ fun loadSettings(ctx: Context): LauncherSettings {
     val d = LauncherSettings()
     return LauncherSettings(
         wallpaper = p.getInt("wallpaper", d.wallpaper),
+        wallSource = parseEnum(p.getString("wallSource", null), d.wallSource),
         shape = parseEnum(p.getString("shape", null), d.shape),
         showNames = p.getBoolean("showNames", d.showNames),
         iconStyle = parseEnum(p.getString("iconStyle", null), d.iconStyle),
@@ -88,6 +100,7 @@ fun loadSettings(ctx: Context): LauncherSettings {
 fun saveSettings(ctx: Context, s: LauncherSettings) {
     ctx.getSharedPreferences("launcher", Context.MODE_PRIVATE).edit()
         .putInt("wallpaper", s.wallpaper)
+        .putString("wallSource", s.wallSource.name)
         .putString("shape", s.shape.name)
         .putBoolean("showNames", s.showNames)
         .putString("iconStyle", s.iconStyle.name)
@@ -95,12 +108,18 @@ fun saveSettings(ctx: Context, s: LauncherSettings) {
         .apply()
 }
 
+/** Focus targets used to wire up D-pad navigation between the dock, top bar and the page content. */
+class Nav(
+    val content: FocusRequester, // the first thing on the current page
+    val pill: FocusRequester,    // the top-right bar (search button)
+    val rail: FocusRequester,    // the dock button for the current page
+)
+
 /** Everything the glass/theme code needs, provided once at the root. */
 class UiCtx(
     val settings: LauncherSettings,
     val wp: Wp,
-    val soft: ImageBitmap?,
-    val heavy: ImageBitmap?,
+    val backdrops: Backdrops?,
     val size: IntSize,
 )
 

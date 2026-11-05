@@ -2,7 +2,11 @@ package com.unwind.launcher
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -23,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,17 +38,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-private const val APP_NAME = "Unwind"
 
 // Pinned to Home the first time it runs (only apps that are installed show up).
 private val DEFAULT_FAVS = listOf(
@@ -59,10 +64,15 @@ private val DEFAULT_FAVS = listOf(
 
 class MainActivity : ComponentActivity() {
     private var resumeTick by mutableIntStateOf(0)
+    private var homeTick by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { LauncherApp(resumeTick) }
+        // Pressing Home while Unwind is already open should bring you back to the Home page.
+        addOnNewIntentListener { intent ->
+            if (intent.hasCategory(Intent.CATEGORY_HOME)) homeTick++
+        }
+        setContent { LauncherApp(resumeTick, homeTick) }
     }
 
     override fun onResume() {
@@ -72,13 +82,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun WallpaperLayer(wp: Wp) {
-    val ctx = LocalContext.current
-    Crossfade(targetState = wp.key, animationSpec = tween(700), label = "wallpaper") { key ->
-        val id = remember(key) { ctx.resources.getIdentifier(key, "drawable", ctx.packageName) }
-        if (id != 0) {
+fun WallpaperLayer(wall: WallData?) {
+    Crossfade(targetState = wall, animationSpec = tween(700), label = "wallpaper") { w ->
+        if (w != null) {
             Image(
-                painterResource(id),
+                w.image,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
@@ -87,17 +95,18 @@ fun WallpaperLayer(wp: Wp) {
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
-                        listOf(Color(0xFFD9A760), Color(0xFF8FA27A), Color(0xFF2F4A35), Color(0xFF101C12))
-                    )
-                )
+                        listOf(Color(0xFFD9A760), Color(0xFF8FA27A), Color(0xFF2F4A35), Color(0xFF101C12)),
+                    ),
+                ),
             )
         }
     }
 }
 
 @Composable
-fun LauncherApp(tick: Int) {
+fun LauncherApp(tick: Int, homeTick: Int) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     val prefs = remember { ctx.getSharedPreferences("launcher", Context.MODE_PRIVATE) }
 
     var apps by remember { mutableStateOf(emptyList<AppEntry>()) }
@@ -111,22 +120,104 @@ fun LauncherApp(tick: Int) {
     var permTick by remember { mutableIntStateOf(0) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
     var backdrops by remember { mutableStateOf<Backdrops?>(null) }
+    var wall by remember { mutableStateOf<WallData?>(null) }
+    var wallVersion by remember { mutableIntStateOf(0) }
+    var wallStatus by remember { mutableStateOf("") }
+    var gallery by remember { mutableStateOf<List<GalleryItem>?>(null) }
     var wifi by remember { mutableStateOf<WifiState?>(null) }
     var acct by remember { mutableStateOf<AcctState?>(null) }
     var inputs by remember { mutableStateOf(emptyList<InputItem>()) }
 
-    val wp = WALLPAPERS[settings.wallpaper.coerceIn(0, WALLPAPERS.lastIndex)]
+    val wp = wall?.wp ?: WALLPAPERS[settings.wallpaper.coerceIn(0, WALLPAPERS.lastIndex)]
+    val storagePerm = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES
+    else Manifest.permission.READ_EXTERNAL_STORAGE
     val locOk = remember(permTick) { hasPerm(ctx, Manifest.permission.ACCESS_FINE_LOCATION) }
     val accOk = remember(permTick) { hasPerm(ctx, Manifest.permission.GET_ACCOUNTS) }
+    val storageOk = remember(permTick) { hasPerm(ctx, storagePerm) }
+    val isHome = remember(tick, homeTick) { isDefaultHome(ctx) }
     val popupFocus = remember { FocusRequester() }
+
+    // Focus targets for moving around with the D-pad
+    val railReqs = remember { List(4) { FocusRequester() } }
+    val pillReq = remember { FocusRequester() }
+    val contentReq = remember { FocusRequester() }
 
     val locationLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permTick++ }
     val accountLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permTick++ }
+    val storageLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permTick++ }
+
+    fun updateSettings(s: LauncherSettings) {
+        settings = s
+        saveSettings(ctx, s)
+    }
+
+    fun applyPicked(uri: Uri) {
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) { saveCustomWallpaper(ctx, uri) }
+            if (ok) {
+                updateSettings(settings.copy(wallSource = WallSource.Custom))
+                wallVersion++
+                screen = Screen.Settings
+            } else {
+                Toast.makeText(ctx, "Couldn't open that picture", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val docLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) applyPicked(uri)
+        }
 
     LaunchedEffect(tick) { apps = withContext(Dispatchers.Default) { loadApps(ctx) } }
-    LaunchedEffect(wp.key) { backdrops = withContext(Dispatchers.Default) { makeBackdrops(ctx, wp.key) } }
+    LaunchedEffect(homeTick) {
+        if (homeTick > 0) {
+            screen = Screen.Home
+            popup = Popup.None
+            focusKick++
+        }
+    }
+
+    // Load whichever wallpaper is selected (stock, Bing daily, or your own picture)
+    LaunchedEffect(settings.wallSource, settings.wallpaper, wallVersion) {
+        val loaded = withContext(Dispatchers.IO) { loadWallpaper(ctx, settings) }
+        if (loaded != null) wall = loaded
+    }
+    // Glass needs blurred copies of the wallpaper, cut to the screen's shape
+    LaunchedEffect(wall, rootSize) {
+        val w = wall
+        if (w != null && rootSize.width > 0 && rootSize.height > 0) {
+            val aspect = rootSize.width.toFloat() / rootSize.height
+            backdrops = withContext(Dispatchers.Default) { makeBackdrops(w.bitmap, aspect) }
+        }
+    }
+    // Bing image of the day: check when opened and then every half hour while the launcher is up
+    LaunchedEffect(settings.wallSource, tick) {
+        if (settings.wallSource == WallSource.Bing) {
+            if (wallStatus.isBlank()) wallStatus = "Checking Bing..."
+            while (true) {
+                val r = withContext(Dispatchers.IO) { refreshBing(ctx) }
+                wallStatus = when {
+                    !r.ok -> r.message
+                    r.message.isBlank() -> "Bing image of the day"
+                    else -> "Today: ${r.message}"
+                }
+                if (r.changed) wallVersion++
+                delay(if (r.ok) 30 * 60 * 1000L else 2 * 60 * 1000L)
+            }
+        } else {
+            wallStatus = ""
+        }
+    }
+    LaunchedEffect(screen, storageOk) {
+        if (screen == Screen.Gallery && storageOk) {
+            gallery = null
+            gallery = withContext(Dispatchers.IO) { queryImages(ctx) }
+        }
+    }
     LaunchedEffect(permTick) { acct = withContext(Dispatchers.IO) { readAccount(ctx) } }
     LaunchedEffect(popup, permTick) {
         when (popup) {
@@ -162,17 +253,25 @@ fun LauncherApp(tick: Int) {
         prefs.edit().putString("favs", next.joinToString(",")).apply()
     }
 
-    fun updateSettings(s: LauncherSettings) {
-        settings = s
-        saveSettings(ctx, s)
-    }
-
     fun requestLocation() {
         locationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
     }
 
     fun requestAccounts() {
         accountLauncher.launch(arrayOf(Manifest.permission.GET_ACCOUNTS, Manifest.permission.READ_CONTACTS))
+    }
+
+    fun openGallery() {
+        screen = Screen.Gallery
+        if (!storageOk) storageLauncher.launch(storagePerm)
+    }
+
+    fun browseFiles() {
+        try {
+            docLauncher.launch(arrayOf("image/*"))
+        } catch (e: Exception) {
+            Toast.makeText(ctx, "This TV has no file browser. Use the picture list instead.", Toast.LENGTH_LONG).show()
+        }
     }
 
     fun openPopup(p: Popup) {
@@ -186,57 +285,104 @@ fun LauncherApp(tick: Int) {
         focusKick++
     }
 
-    BackHandler(enabled = screen != Screen.Home) { screen = Screen.Home }
+    BackHandler(enabled = screen != Screen.Home) {
+        screen = if (screen == Screen.Gallery) Screen.Settings else Screen.Home
+    }
+    // When Unwind is the Home app, Back on the Home page does nothing (it shouldn't close the launcher)
+    BackHandler(enabled = isHome && screen == Screen.Home && popup == Popup.None) { }
     BackHandler(enabled = popup != Popup.None) { closePopup() }
 
-    val ui = UiCtx(settings, wp, backdrops?.soft, backdrops?.heavy, rootSize)
+    val ui = UiCtx(settings, wp, backdrops, rootSize)
     val railSel = when (screen) {
         Screen.Home -> 0
         Screen.Search -> 1
         Screen.Apps, Screen.Edit -> 2
-        Screen.Settings -> 3
+        Screen.Settings, Screen.Gallery -> 3
     }
+    val nav = Nav(contentReq, pillReq, railReqs[railSel])
+    val title = when (screen) {
+        Screen.Home -> "Home"
+        Screen.Search -> "Search"
+        Screen.Apps -> "Apps"
+        Screen.Edit -> "Favorites"
+        Screen.Settings, Screen.Gallery -> "Preferences"
+    }
+    val scrimA = (0.45f + 0.35f * wp.luma).coerceIn(0.45f, 0.85f)
 
     Box(Modifier.fillMaxSize().background(Color.Black).onSizeChanged { rootSize = it }) {
         CompositionLocalProvider(LocalUi provides ui) {
             // While a popup is open, nothing behind it can take focus.
             Box(Modifier.fillMaxSize().focusProperties { canFocus = popup == Popup.None }) {
-                WallpaperLayer(wp)
-                // Soft scrims keep text readable on any wallpaper
+                WallpaperLayer(wall)
+                // Soft scrims keep text readable on any wallpaper (stronger on bright pictures)
                 Box(
                     Modifier.fillMaxSize().background(
-                        Brush.horizontalGradient(0f to Color(0xB0000000), 0.62f to Color.Transparent)
-                    )
+                        Brush.horizontalGradient(0f to Color.Black.copy(alpha = scrimA), 0.62f to Color.Transparent),
+                    ),
                 )
                 Box(
                     Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color(0xA0000000))
-                    )
+                        Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = scrimA * 0.9f)),
+                    ),
                 )
 
                 when (screen) {
                     Screen.Home -> HomeContent(
                         favApps = favApps,
                         focusKick = focusKick,
+                        nav = nav,
                         onLaunch = { launchApp(ctx, it) },
                         onAdd = { screen = Screen.Edit },
                     )
-                    Screen.Apps -> AppGrid(apps, false, favPkgs.toSet(), focusKick) { launchApp(ctx, it) }
-                    Screen.Edit -> AppGrid(apps, true, favPkgs.toSet(), focusKick) { toggleFav(it.pkg) }
-                    Screen.Search -> SearchScreen(apps, focusKick) { launchApp(ctx, it) }
-                    Screen.Settings -> SettingsScreen(settings, focusKick) { updateSettings(it) }
+                    Screen.Apps -> AppGrid(apps, false, favPkgs.toSet(), focusKick, nav) { launchApp(ctx, it) }
+                    Screen.Edit -> AppGrid(apps, true, favPkgs.toSet(), focusKick, nav) { toggleFav(it.pkg) }
+                    Screen.Search -> SearchScreen(apps, focusKick, nav) { launchApp(ctx, it) }
+                    Screen.Settings -> SettingsScreen(
+                        settings = settings,
+                        focusKick = focusKick,
+                        nav = nav,
+                        wallVersion = wallVersion,
+                        wallStatus = wallStatus,
+                        onChange = { updateSettings(it) },
+                        onPickCustom = {
+                            if (customFile(ctx).exists() && settings.wallSource != WallSource.Custom) {
+                                updateSettings(settings.copy(wallSource = WallSource.Custom))
+                            } else {
+                                openGallery()
+                            }
+                        },
+                        onOpenHomeSettings = { openHomeSettings(ctx) },
+                    )
+                    Screen.Gallery -> GalleryScreen(
+                        items = gallery,
+                        hasPerm = storageOk,
+                        nav = nav,
+                        onGrant = { storageLauncher.launch(storagePerm) },
+                        onBrowse = { browseFiles() },
+                        onPick = { applyPicked(it.uri) },
+                    )
                 }
 
-                Text(
-                    APP_NAME,
-                    color = Color.White,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.SansSerif,
-                    modifier = Modifier.align(Alignment.TopStart).padding(start = 33.dp, top = 28.dp),
-                )
+                // Header: always says which screen you're on
+                Crossfade(
+                    targetState = title,
+                    animationSpec = tween(220),
+                    modifier = Modifier.align(Alignment.TopStart).padding(start = 33.dp, top = 26.dp),
+                    label = "header",
+                ) { t ->
+                    Text(
+                        t,
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.SansSerif,
+                        letterSpacing = 0.3.sp,
+                        style = TextStyle(shadow = Shadow(Color(0x66000000), blurRadius = 12f)),
+                    )
+                }
                 TopPill(
                     acct = acct,
+                    nav = nav,
                     onSearch = { screen = Screen.Search },
                     onSystem = { openSystemSettings(ctx) },
                     onWifi = { openPopup(Popup.Wifi) },
@@ -255,6 +401,8 @@ fun LauncherApp(tick: Int) {
                             else -> {}
                         }
                     },
+                    reqs = railReqs,
+                    toContent = contentReq,
                     modifier = Modifier.align(Alignment.CenterStart).padding(start = 33.dp, top = 24.dp),
                 )
             }

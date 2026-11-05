@@ -3,27 +3,41 @@ package com.unwind.launcher
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.graphics.drawable.Drawable
+import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 class AppEntry(
     val pkg: String,
     val label: String,
     val intent: Intent,
-    val icon: ImageBitmap,
-    val mask: ImageBitmap?, // white glyph with alpha, cropped tight; null when we couldn't isolate one
+    val icon: ImageBitmap,  // full-color icon, pre-scaled to the size it's drawn at
+    val mask: ImageBitmap?, // white glyph with alpha, cropped tight; null when no clean glyph could be isolated
     val bg: Color,          // the icon's own background color (Transparent if it has none)
 )
 
+/** Icons are expensive to analyze, so each one is built once per app launch of the launcher. */
+private class Built(val icon: ImageBitmap, val mask: ImageBitmap?, val bg: Color)
+
+private val iconCache = HashMap<String, Built>()
+
 fun loadApps(ctx: Context): List<AppEntry> {
     val pm = ctx.packageManager
+    val density = ctx.resources.displayMetrics.density
+    // Tiles are 76dp; the glyph box is 58% of that and the full icon 62%. Aim a little above for crisp scaling.
+    val maskPx = (76f * 0.58f * density * 1.12f).roundToInt().coerceIn(64, WORK)
+    val iconPx = (76f * 0.62f * density * 1.12f).roundToInt().coerceIn(64, WORK)
     val out = LinkedHashMap<String, AppEntry>()
     for (cat in listOf(Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER)) {
         val query = Intent(Intent.ACTION_MAIN).addCategory(cat)
@@ -34,9 +48,9 @@ fun loadApps(ctx: Context): List<AppEntry> {
                 .addCategory(cat)
                 .setClassName(pkg, ri.activityInfo.name)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            val bmp = ri.loadIcon(pm).toBitmap(N, N)
-            val g = extractGlyph(bmp)
-            out[pkg] = AppEntry(pkg, ri.loadLabel(pm).toString(), launch, bmp.asImageBitmap(), g.mask, g.bg)
+            val key = "$pkg/${ri.activityInfo.name}@$maskPx"
+            val built = builtFor(key, { ri.loadIcon(pm) }, maskPx, iconPx)
+            out[pkg] = AppEntry(pkg, ri.loadLabel(pm).toString(), launch, built.icon, built.mask, built.bg)
         }
     }
     return out.values.sortedBy { it.label.lowercase() }
@@ -66,12 +80,53 @@ fun openSystemSettings(ctx: Context) = tryStart(ctx, Intent(Settings.ACTION_SETT
 fun openWifiSettings(ctx: Context) = tryStart(ctx, Intent(Settings.ACTION_WIFI_SETTINGS), Intent(Settings.ACTION_SETTINGS))
 fun openAccountSettings(ctx: Context) =
     tryStart(ctx, Intent(Settings.ACTION_SYNC_SETTINGS), Intent(Settings.ACTION_SETTINGS))
+fun openHomeSettings(ctx: Context) =
+    tryStart(ctx, Intent(Settings.ACTION_HOME_SETTINGS), Intent(Settings.ACTION_SETTINGS))
 
 // ---------- Turning an app icon into a tintable glyph ----------
 
-private const val N = 128
+/** Icons are analyzed at this size, then shrunk to the exact size they're shown at. */
+private const val WORK = 256
 
-private class Glyph(val mask: ImageBitmap?, val bg: Color)
+private class Glyph(val mask: Bitmap?, val bg: Color)
+
+private fun buildIcon(d: Drawable, maskPx: Int, iconPx: Int): Built {
+    val full = d.toBitmap(WORK, WORK, Bitmap.Config.ARGB_8888)
+    var layered: Glyph? = null
+    if (Build.VERSION.SDK_INT >= 26 && d is AdaptiveIconDrawable) {
+        layered = adaptiveGlyph(d)
+    }
+    val glyph = layered ?: extractGlyph(full, 0)
+    val mask = glyph.mask?.let { fitDown(it, maskPx).asImageBitmap() }
+    return Built(fitDown(full, iconPx).asImageBitmap(), mask, glyph.bg)
+}
+
+private fun builtFor(key: String, drawable: () -> Drawable, maskPx: Int, iconPx: Int): Built {
+    val cached = iconCache[key]
+    if (cached != null) return cached
+    val d = drawable()
+    val b = try {
+        buildIcon(d, maskPx, iconPx)
+    } catch (e: Throwable) {
+        val plain = try {
+            d.toBitmap(iconPx, iconPx, Bitmap.Config.ARGB_8888)
+        } catch (e2: Throwable) {
+            Bitmap.createBitmap(iconPx, iconPx, Bitmap.Config.ARGB_8888)
+        }
+        Built(plain.asImageBitmap(), null, Color.Transparent)
+    }
+    iconCache[key] = b
+    return b
+}
+
+private fun fitDown(src: Bitmap, target: Int): Bitmap {
+    val longest = max(src.width, src.height)
+    if (longest <= target) return src
+    val s = target.toFloat() / longest
+    val tw = max(1, (src.width * s).roundToInt())
+    val th = max(1, (src.height * s).roundToInt())
+    return scaleDown(src, tw, th)
+}
 
 private fun dist(a: Int, b: Int): Float {
     val dr = ((a shr 16) and 255) - ((b shr 16) and 255)
@@ -88,33 +143,119 @@ private fun smooth(e0: Float, e1: Float, x: Float): Float {
     return t * t * (3f - 2f * t)
 }
 
+private class Stats(
+    val minX: Int, val minY: Int, val maxX: Int, val maxY: Int,
+    val count: Int, val total: Int,
+) {
+    val bw: Int get() = maxX - minX + 1
+    val bh: Int get() = maxY - minY + 1
+    val fill: Float get() = count / (bw * bh).toFloat()       // how solid the shape is inside its box
+    val areaFrac: Float get() = (bw * bh) / total.toFloat()   // how much of the icon the shape's box covers
+    val coverage: Float get() = count / total.toFloat()
+}
+
+private fun inkStats(ink: FloatArray, w: Int, h: Int): Stats? {
+    var minX = w
+    var minY = h
+    var maxX = -1
+    var maxY = -1
+    var count = 0
+    for (y in 0 until h) for (x in 0 until w) {
+        if (ink[y * w + x] > 0.35f) {
+            count++
+            if (x < minX) minX = x
+            if (x > maxX) maxX = x
+            if (y < minY) minY = y
+            if (y > maxY) maxY = y
+        }
+    }
+    return if (count == 0) null else Stats(minX, minY, maxX, maxY, count, w * h)
+}
+
+/** A believable logo: not a speck, not the whole icon, not a solid blob. */
+private fun isClean(s: Stats, maxFill: Float): Boolean =
+    s.coverage in 0.012f..0.55f && s.fill <= maxFill && s.bw >= 6 && s.bh >= 6
+
+private fun buildMask(ink: FloatArray, w: Int, h: Int, s: Stats): Bitmap {
+    val pad = max(2, w / 64)
+    val x0 = max(0, s.minX - pad)
+    val y0 = max(0, s.minY - pad)
+    val x1 = min(w - 1, s.maxX + pad)
+    val y1 = min(h - 1, s.maxY + pad)
+    val bw = x1 - x0 + 1
+    val bh = y1 - y0 + 1
+    val out = IntArray(bw * bh)
+    for (y in 0 until bh) for (x in 0 until bw) {
+        val a = (ink[(y + y0) * w + (x + x0)] * 255f).toInt().coerceIn(0, 255)
+        out[y * bw + x] = (a shl 24) or 0xFFFFFF
+    }
+    val b = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888)
+    b.setPixels(out, 0, bw, 0, 0, bw, bh)
+    return b
+}
+
 /**
- * Separates the logo from the icon's background so it can be re-tinted. Works on solid backgrounds
- * (white YouTube/Netflix tiles, blue Prime tile), gradients with a light logo, and transparent icons.
- * If it can't find a clean glyph it returns mask = null and the UI falls back to the original icon.
+ * Modern icons come in layers. The foreground layer is the logo on a transparent canvas, which is
+ * exactly the glyph we want (Android 13+ icons can even ship a dedicated single-color layer).
  */
-private fun extractGlyph(bmp: Bitmap): Glyph {
-    val px = IntArray(N * N)
-    bmp.getPixels(px, 0, N, 0, 0, N, N)
+@RequiresApi(26)
+private fun adaptiveGlyph(d: AdaptiveIconDrawable): Glyph? {
+    val mono: Drawable? = if (Build.VERSION.SDK_INT >= 33) d.monochrome else null
+    val layer: Drawable = mono ?: d.foreground ?: return null
+    val size = WORK * 3 / 2 // the layer canvas is larger than the visible icon
+    val bmp = layer.toBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val px = IntArray(size * size)
+    bmp.getPixels(px, 0, size, 0, 0, size, size)
+    val ink = FloatArray(size * size)
+    for (i in ink.indices) ink[i] = (px[i] ushr 24) / 255f
+    val s = inkStats(ink, size, size) ?: return null
+    // a solid blob means the foreground has its own tile; let the color-based method handle those
+    if (!isClean(s, 0.72f)) return null
+    return Glyph(buildMask(ink, size, size, s), Color.Transparent)
+}
+
+/**
+ * Separates the logo from the icon's background by color, for icons that aren't layered.
+ * Handles solid tiles, gradients with a light logo, transparent icons, and a logo sitting on a
+ * smaller tile inside the icon. Returns mask = null if no clean glyph is found.
+ */
+private fun extractGlyph(bmp: Bitmap, depth: Int): Glyph {
+    val w = bmp.width
+    val h = bmp.height
+    val px = IntArray(w * h)
+    bmp.getPixels(px, 0, w, 0, 0, w, h)
+    val bpx = max(3, min(w, h) / 40)
     val border = ArrayList<Int>()
     var transparent = 0
     var total = 0
-    for (y in 0 until N) for (x in 0 until N) {
-        if (x < 5 || y < 5 || x >= N - 5 || y >= N - 5) {
+    for (y in 0 until h) for (x in 0 until w) {
+        if (x < bpx || y < bpx || x >= w - bpx || y >= h - bpx) {
             total++
-            val p = px[y * N + x]
+            val p = px[y * w + x]
             if ((p ushr 24) < 40) transparent++ else border.add(p)
         }
     }
-    val ink = FloatArray(N * N)
+    val ink = FloatArray(w * h)
     var bgColor = Color.Transparent
     if (transparent > total / 2 || border.isEmpty()) {
         for (i in ink.indices) ink[i] = (px[i] ushr 24) / 255f
     } else {
-        fun median(shift: Int): Int = border.map { (it shr shift) and 255 }.sorted()[border.size / 2]
-        val bg = (0xFF shl 24) or (median(16) shl 16) or (median(8) shl 8) or median(0)
+        val n = border.size
+        val rs = IntArray(n)
+        val gs = IntArray(n)
+        val bs = IntArray(n)
+        for (i in 0 until n) {
+            val p = border[i]
+            rs[i] = (p shr 16) and 255
+            gs[i] = (p shr 8) and 255
+            bs[i] = p and 255
+        }
+        rs.sort(); gs.sort(); bs.sort()
+        val bg = (0xFF shl 24) or (rs[n / 2] shl 16) or (gs[n / 2] shl 8) or bs[n / 2]
         bgColor = Color(bg)
-        val spread = border.map { dist(it, bg) }.average().toFloat()
+        var spreadSum = 0f
+        for (p in border) spreadSum += dist(p, bg)
+        val spread = spreadSum / n
         val lb = lum(bg)
         for (i in ink.indices) {
             val p = px[i]
@@ -127,31 +268,15 @@ private fun extractGlyph(bmp: Bitmap): Glyph {
             }
         }
     }
-    var minX = N
-    var minY = N
-    var maxX = -1
-    var maxY = -1
-    var count = 0
-    for (y in 0 until N) for (x in 0 until N) {
-        if (ink[y * N + x] > 0.35f) {
-            count++
-            minX = min(minX, x); maxX = max(maxX, x)
-            minY = min(minY, y); maxY = max(maxY, y)
-        }
-    }
-    val coverage = count / (N * N).toFloat()
-    if (count == 0 || coverage > 0.6f || coverage < 0.01f) return Glyph(null, bgColor)
+    val s = inkStats(ink, w, h) ?: return Glyph(null, bgColor)
+    if (isClean(s, 0.93f)) return Glyph(buildMask(ink, w, h, s), bgColor)
 
-    minX = max(0, minX - 2); minY = max(0, minY - 2)
-    maxX = min(N - 1, maxX + 2); maxY = min(N - 1, maxY + 2)
-    val w = maxX - minX + 1
-    val h = maxY - minY + 1
-    val out = IntArray(w * h)
-    for (y in 0 until h) for (x in 0 until w) {
-        val a = (ink[(y + minY) * N + (x + minX)] * 255f).toInt().coerceIn(0, 255)
-        out[y * w + x] = (a shl 24) or 0xFFFFFF
+    // The "logo" is a big solid tile covering most of the icon (e.g. a white square with the real
+    // logo inside it). Look inside the tile once.
+    if (depth == 0 && s.fill > 0.93f && s.areaFrac in 0.35f..0.99f && s.bw > 24 && s.bh > 24) {
+        val inner = Bitmap.createBitmap(bmp, s.minX, s.minY, s.bw, s.bh)
+        val g = extractGlyph(inner, depth + 1)
+        if (g.mask != null) return Glyph(g.mask, bgColor)
     }
-    val mb = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-    mb.setPixels(out, 0, w, 0, 0, w, h)
-    return Glyph(mb.asImageBitmap(), bgColor)
+    return Glyph(null, bgColor)
 }

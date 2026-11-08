@@ -25,6 +25,7 @@ Same home screen, two wallpapers, two glass styles. The colors change on their o
   </tr>
   <tr>
     <td><img src="shot_home_liquid_amber.png" alt="Liquid Glass, amber wallpaper"></td>
+    <td><img src="shot_home_normal_amber.png" alt="Normal glass, amber wallpaper"></td>
   </tr>
   <tr>
     <td align="center">Liquid Glass, my own photo</td>
@@ -58,11 +59,7 @@ Day to day:
 
 ## Getting the APK
 
-GitHub builds the app every time something is pushed.
-
-1. Open the [Actions tab](https://github.com/hazir6677/The-Unwind-Launcher/actions) and click the latest run with a green check.
-2. Scroll to the bottom and download `unwind-launcher-apk` (you need to be signed in to GitHub for this).
-3. Unzip it and sideload `app-debug.apk` onto the TV.
+Download the latest `app-debug.apk` from the [Releases page](https://github.com/hazir6677/The-Unwind-Launcher/releases) and sideload it onto your TV.
 
 The APK is signed with a debug key. That's fine for sideloading, it just means it won't go on the Play Store as is.
 
@@ -108,15 +105,6 @@ Bing daily needs internet. It checks when the launcher opens and every half hour
 - Pictures and storage: only to show your pictures when you pick a wallpaper. It asks the first time you open the picker.
 - Accounts and contacts: only to show which Google account is signed in.
 
-## Changing things in code
-
-- Default pinned apps: `DEFAULT_FAVS` in `MainActivity.kt`
-- Stock wallpaper list and their colors: `WALLPAPERS` in `Model.kt`
-- Glass looks and refraction strength: `glass()` in `Glass.kt` (the `backdropBrush` zoom values)
-- Motion feel: `LiquidSpring` in `Glass.kt`
-- Icon extraction: `AppData.kt`
-- Stock wallpapers: replace any of the `wp_*.jpg` files (1920x1080 works best)
-
 ## How it works
 
 **Glass.** Each wallpaper is blurred ahead of time at three strengths and cut to the shape of whatever's being drawn. Normal and Frost just draw the matching blurred slice behind a tint. Liquid Glass stacks six thin lens bands. The outer rim pulls in wallpaper from outside the shape, which is what the edge of a real glass does. Each band further in does a little less of that, and the center magnifies slightly. It's all anti-aliased paths, so edges stay smooth as things scale.
@@ -126,24 +114,6 @@ Bing daily needs internet. It checks when the launcher opens and every half hour
 **Colors.** The wallpaper is sampled for its dominant hue, and the accent, glass tint and dark shade come from that. Bright pictures get a stronger dark overlay so the text stays readable.
 
 **Apps.** It lists both TV apps and regular phone apps, which is why sideloaded phone apps show up in the grid.
-
-## Project layout
-
-Everything sits in the repo root on purpose, so you can upload files from a phone or tablet. The workflow in `.github/workflows/build.yml` moves them into a normal Android project layout before it builds.
-
-- `MainActivity.kt`: activity, screen routing, popups, state, Home button handling
-- `Screens.kt`: Home, All apps, Search, Preferences, wallpaper picker
-- `Components.kt`: tiles, dock, top bar, popups, D-pad wiring
-- `Glass.kt`: Liquid, Normal and Frost glass, wallpaper blur
-- `Wallpapers.kt`: wallpaper loading, Bing daily, TV-storage picker, color extraction
-- `AppData.kt`: installed apps and icon extraction
-- `SystemInfo.kt`: Wi-Fi, TV inputs, accounts, default-Home check
-- `Model.kt`: settings, wallpapers, shapes
-- `AndroidManifest.xml`: permissions and the launcher/Home entries
-- `unwind_icon.png`, `unwind_banner.png`: app icon and TV banner
-- `wp_*.jpg`: stock wallpapers
-- `shot_*.png`: screenshots used in this README
-- the Gradle files: `app-build.gradle.kts`, `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`, `proguard-rules.pro`
 
 ## Tech
 

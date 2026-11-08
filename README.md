@@ -1,154 +1,167 @@
-<div align="center">
-
 # Unwind Launcher
 
-**A calm, glassy home screen for Android TV.**
-
-Liquid-glass panels, themed app icons, a daily Bing wallpaper (or your own photo), and a settings page that lets you make it yours.
+A custom home screen for Android TV. Frosted glass panels sit on top of your wallpaper, and the icons, glass and highlights all take their colors from whatever picture you pick.
 
 [![Build APK](https://github.com/hazir6677/The-Unwind-Launcher/actions/workflows/build.yml/badge.svg)](https://github.com/hazir6677/The-Unwind-Launcher/actions/workflows/build.yml)
-![Android TV](https://img.shields.io/badge/Android%20TV-10%2B-3ddc84)
-![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7f52ff)
 
-</div>
+<p align="center">
+  <img src="shot_home_liquid_amber.png" alt="Unwind home screen with Liquid Glass and an amber sunrise wallpaper" width="100%">
+</p>
 
-<!-- To add a screenshot: upload a file named screenshot.png to the repo root, then remove the comment markers on the next line.
-Crop out your account email and Wi-Fi name first.
-![Unwind Launcher](screenshot.png)
--->
+I run it on a 55-inch Xiaomi TV, so that's where most of the testing happened.
 
-## Features
+## Screenshots
 
-**Look and feel**
-- **Three glass styles:** Liquid Glass, Normal, and Frost Glass. Liquid Glass bends the wallpaper at the edges like real glass (refraction), adds edge light and a rainbow fringe, and swells with a springy motion when you focus it.
-- **Wallpapers:** six stock wallpapers, **Bing image of the day** (changes daily), or **your own picture** from the TV or a USB drive. Icons, glass, and highlights are tinted from whatever picture is on screen.
-- **Themed icons:** logos are separated from their backgrounds at high resolution and recolored to match the wallpaper. Anything that can't be separated is shown as a two-tone chip, so every icon still matches. Switch to Original for full-color icons.
-- **Icon shapes:** Circle, Squircle, Rounded, or Hexagon. App names can be hidden on Home.
-- **Smooth motion:** one spring curve drives focus, the dock highlight slides between pages, and the wallpaper cross-fades.
-- **Page header:** the top-left always says where you are: Home, Search, Apps, Favorites, or Preferences.
+Same home screen, two wallpapers, two glass styles. The colors change on their own when the wallpaper does.
 
-**Everyday use**
-- **Pinned apps row:** your favorites on Home, with an Add apps tile to choose them.
-- **All apps grid:** includes sideloaded phone apps like Google Photos that stock launchers hide.
-- **App search:** an on-screen keyboard that filters your installed apps as you type.
-- **Top bar:** system settings, **all nearby Wi-Fi networks** (with signal and band), TV inputs (HDMI in order, no duplicates), clock, and your Google account.
-- **Remote friendly:** the D-pad always takes you back and forth between the dock, the top bar, and your apps.
-- **Home screen replacement:** can be set as the app the Home button opens (see below).
+<table>
+  <tr>
+    <td><img src="shot_home_liquid_green.png" alt="Liquid Glass, green wallpaper"></td>
+    <td><img src="shot_home_normal_green.png" alt="Normal glass, green wallpaper"></td>
+  </tr>
+  <tr>
+    <td align="center">Liquid Glass, Misty Valley wallpaper</td>
+    <td align="center">Normal glass, Misty Valley wallpaper</td>
+  </tr>
+  <tr>
+    <td><img src="shot_home_liquid_amber.png" alt="Liquid Glass, amber wallpaper"></td>
+    <td><img src="shot_home_normal_amber.png" alt="Normal glass, amber wallpaper"></td>
+  </tr>
+  <tr>
+    <td align="center">Liquid Glass, my own photo</td>
+    <td align="center">Normal glass, my own photo</td>
+  </tr>
+</table>
 
-## Make it your Home screen
+And the Preferences page, where you pick the wallpaper, glass style and icon shape:
 
-1. Press the **Home** button on your remote.
-2. If the TV asks which Home app to use, pick **Unwind**, then choose **Always**.
-3. No question? Open **Preferences** in Unwind, scroll to the bottom, and tap **Open Home settings**. Pick Unwind there.
+<p align="center">
+  <img src="shot_preferences.png" alt="Unwind Preferences page" width="100%">
+</p>
 
-To go back, pick your TV's original Home app in the same place, or uninstall Unwind.
+## What you get
 
-Some TVs lock the Home button to their built-in home screen. If yours does, Unwind still works as an app, and a one-time ADB command can make it the default (see below).
+There are three glass styles: Liquid Glass, Normal and Frost Glass. Normal is a tinted, softly blurred panel. Frost Glass is a heavier, milkier blur. Liquid Glass is the fancy one. It bends the wallpaper at the edges the way a real piece of glass would, adds a bit of edge light and a rainbow fringe, and swells with a springy motion when you focus on it.
 
-<details>
-<summary>ADB method (computer needed, once)</summary>
+For wallpapers you can use one of the six that come with it, the Bing image of the day, or your own picture from the TV or a USB drive.
 
-1. On the TV: Settings, Device Preferences, About, press **Build** 7 times to unlock Developer options. Then turn on **Network debugging** (or USB debugging).
-2. On a computer with ADB installed, connect: `adb connect <TV-IP-address>`
+App icons get recolored to match the wallpaper. The logo is pulled off its background at high resolution and tinted. If an icon can't be separated cleanly, it shows up as a two-tone chip so it still fits in. You can switch to Original if you'd rather have the full-color icons. Icon shapes are Circle, Squircle, Rounded and Hexagon, and you can hide the app names on Home.
+
+The top-left corner always tells you where you are: Home, Search, Apps, Favorites or Preferences.
+
+Day to day:
+
+- Home has a row of pinned apps, plus an Add apps tile for choosing them.
+- The All apps grid includes sideloaded phone apps like Google Photos, which most TV launchers hide.
+- Search is an on-screen keyboard that filters your installed apps as you type.
+- The top bar has system settings, a list of every nearby Wi-Fi network (with signal strength and band), TV inputs, the clock, and your Google account.
+- The D-pad moves between the dock, the top bar and your apps, in both directions.
+
+## Getting the APK
+
+GitHub builds the app every time something is pushed.
+
+1. Open the [Actions tab](https://github.com/hazir6677/The-Unwind-Launcher/actions) and click the latest run with a green check.
+2. Scroll to the bottom and download `unwind-launcher-apk` (you need to be signed in to GitHub for this).
+3. Unzip it and sideload `app-debug.apk` onto the TV.
+
+The APK is signed with a debug key. That's fine for sideloading, it just means it won't go on the Play Store as is.
+
+## Making it your Home screen
+
+Press the Home button on your remote. If the TV asks which Home app to use, pick Unwind and choose Always.
+
+If it doesn't ask, open Preferences in Unwind, scroll to the bottom and tap Open Home settings, then pick Unwind from there.
+
+To go back, pick your TV's original Home app in the same place, or just uninstall Unwind.
+
+Some TVs lock the Home button to their built-in screen. Xiaomi does this on some models. If yours does, Unwind still works as a regular app, and you can force it with ADB:
+
+1. On the TV, go to Settings > Device Preferences > About and press Build seven times to unlock Developer options. Then turn on Network debugging (or USB debugging).
+2. On a computer with ADB, connect: `adb connect <TV-IP-address>`
 3. Run: `adb shell cmd package set-home-activity com.unwind.launcher/.MainActivity`
 
-To undo it, uninstall Unwind (`adb uninstall com.unwind.launcher`).
+To undo it, uninstall Unwind: `adb uninstall com.unwind.launcher`
 
-</details>
+## Finding your way around
 
-## Using it
+The dock on the left has four buttons: house for Home, magnifier for search, grid for all apps, sliders for Preferences.
 
-| Where | What it does |
-| --- | --- |
-| Dock: house | Home screen |
-| Dock: magnifier | In-launcher app search |
-| Dock: grid | All installed apps |
-| Dock: sliders | Preferences |
-| Top bar: magnifier | App search |
-| Top bar: gear | Android system settings |
-| Top bar: Wi-Fi | Nearby networks, connected one highlighted |
-| Top bar: HDMI icon | Switch TV inputs |
-| Top bar: avatar | Signed-in Google account |
-| Add apps tile | Choose which apps are pinned to Home |
+The pill in the top right has the same search shortcut, a gear for Android system settings, Wi-Fi (the connected network is highlighted), an HDMI icon for switching inputs, the clock, and an avatar showing which Google account is signed in.
 
 ## Preferences
 
-| Setting | Options |
-| --- | --- |
-| Wallpaper | Bing daily, My photo, or 6 stock wallpapers |
-| Glass style | Liquid Glass, Normal, Frost Glass |
-| Icon shape | Circle, Squircle, Rounded, Hexagon |
-| Icon style | Themed, Original |
-| App names | On or off |
-| Home screen | Short guide and a shortcut to Home settings |
+- Wallpaper: Bing daily, My photo, or one of the six stock wallpapers
+- Glass style: Liquid Glass, Normal, Frost Glass
+- Icon shape: Circle, Squircle, Rounded, Hexagon
+- Icon style: Themed or Original
+- App names: on or off
+- Home screen: a short guide and a shortcut to the Home settings
 
-**Your own picture:** choose **My photo**, then pick from the list of pictures on the TV or USB drive (or tap **Browse files...**). It is copied into the launcher, so it stays even if the original is removed.
+For your own picture, choose My photo, then pick from the list of pictures on the TV or USB drive (or tap Browse files). The picture gets copied into the launcher, so it stays even if you delete the original. Tap My photo again any time to choose a different one.
 
-**Bing daily:** needs internet. It checks when the launcher opens and again every half hour, and only downloads when there's a new picture.
+Bing daily needs internet. It checks when the launcher opens and every half hour after that, and only downloads when there's a new picture.
 
 ## Permissions
 
-| Permission | Why |
-| --- | --- |
-| Internet | Downloads the Bing picture of the day. |
-| Location + Wi-Fi state | Android requires location to list nearby Wi-Fi networks. Nothing is stored or sent anywhere. |
-| Pictures / storage | Only to show your pictures so you can pick a wallpaper. Asked the first time you open the picker. |
-| Accounts and contacts | Only to show which Google account is signed in. |
+- Internet: to download the Bing picture of the day.
+- Location and Wi-Fi state: Android won't let an app list nearby Wi-Fi networks without location access. Nothing is stored or sent anywhere.
+- Pictures and storage: only to show your pictures when you pick a wallpaper. It asks the first time you open the picker.
+- Accounts and contacts: only to show which Google account is signed in.
 
-## Customize in code
+## Changing things in code
 
-| What | Where |
-| --- | --- |
-| Default pinned apps | `DEFAULT_FAVS` in `MainActivity.kt` |
-| Stock wallpaper list and colors | `WALLPAPERS` in `Model.kt` |
-| Glass looks and refraction strength | `glass()` in `Glass.kt` (the `backdropBrush` zoom values) |
-| Motion feel | `LiquidSpring` in `Glass.kt` |
-| Icon extraction | `AppData.kt` |
-| Stock wallpapers | Replace one of the `wp_*.jpg` files (1920x1080 works best) |
+- Default pinned apps: `DEFAULT_FAVS` in `MainActivity.kt`
+- Stock wallpaper list and their colors: `WALLPAPERS` in `Model.kt`
+- Glass looks and refraction strength: `glass()` in `Glass.kt` (the `backdropBrush` zoom values)
+- Motion feel: `LiquidSpring` in `Glass.kt`
+- Icon extraction: `AppData.kt`
+- Stock wallpapers: replace any of the `wp_*.jpg` files (1920x1080 works best)
 
 ## How it works
 
-- **Glass:** each wallpaper is pre-blurred at three strengths and cut to the screen's shape. Normal and Frost draw the matching blurred slice behind a tint. Liquid draws six thin nested lens bands: the outer rim pulls in wallpaper from outside the shape (what a glass edge does), each band inward does less of that, and the center magnifies slightly. Everything is anti-aliased paths, so edges stay smooth while scaling.
-- **Themed icons:** modern icons are split into layers, and the foreground layer is exactly the logo. Older icons are analyzed by color, including logos sitting on a tile inside the icon. Glyphs are shrunk in halves to the exact size they're shown at, which avoids jagged edges on big screens.
-- **Wallpaper colors:** the picture is sampled for its dominant hue, and the accent, glass tint, and dark shade are derived from it. Bright pictures get a stronger scrim so text stays readable.
-- **Apps:** it lists both TV apps and regular phone apps, so sideloaded phone apps appear in the grid.
+**Glass.** Each wallpaper is blurred ahead of time at three strengths and cut to the shape of whatever's being drawn. Normal and Frost just draw the matching blurred slice behind a tint. Liquid Glass stacks six thin lens bands. The outer rim pulls in wallpaper from outside the shape, which is what the edge of a real glass does. Each band further in does a little less of that, and the center magnifies slightly. It's all anti-aliased paths, so edges stay smooth as things scale.
+
+**Icons.** Modern Android icons come in layers, and the foreground layer is exactly the logo, so that's what gets used. Older icons are analyzed by color, including logos sitting on a tile inside the icon. The logo is shrunk in halves down to the size it's shown at, which avoids jagged edges on a big screen.
+
+**Colors.** The wallpaper is sampled for its dominant hue, and the accent, glass tint and dark shade come from that. Bright pictures get a stronger dark overlay so the text stays readable.
+
+**Apps.** It lists both TV apps and regular phone apps, which is why sideloaded phone apps show up in the grid.
 
 ## Project layout
 
-All files sit in the repo root so they can be uploaded from a phone or tablet. The workflow in `.github/workflows/build.yml` moves them into a standard Android project before building.
+Everything sits in the repo root on purpose, so you can upload files from a phone or tablet. The workflow in `.github/workflows/build.yml` moves them into a normal Android project layout before it builds.
 
-| File | Purpose |
-| --- | --- |
-| `MainActivity.kt` | Activity, screen routing, popups, state, Home button handling |
-| `Screens.kt` | Home, All apps, Search, Preferences, wallpaper picker |
-| `Components.kt` | Tiles, dock, top bar, popups, D-pad wiring |
-| `Glass.kt` | Liquid / Normal / Frost glass and wallpaper blur |
-| `Wallpapers.kt` | Wallpaper loading, Bing daily, TV-storage picker, color extraction |
-| `AppData.kt` | Installed apps and icon glyph extraction |
-| `SystemInfo.kt` | Wi-Fi, TV inputs, accounts, default-Home check |
-| `Model.kt` | Settings, wallpapers, shapes |
-| `AndroidManifest.xml` | Permissions, launcher and Home entries |
-| `unwind_icon.png`, `unwind_banner.png` | App icon and TV banner |
-| `wp_*.jpg` | Stock wallpapers |
-| `app-build.gradle.kts`, `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`, `proguard-rules.pro` | Gradle setup |
+- `MainActivity.kt`: activity, screen routing, popups, state, Home button handling
+- `Screens.kt`: Home, All apps, Search, Preferences, wallpaper picker
+- `Components.kt`: tiles, dock, top bar, popups, D-pad wiring
+- `Glass.kt`: Liquid, Normal and Frost glass, wallpaper blur
+- `Wallpapers.kt`: wallpaper loading, Bing daily, TV-storage picker, color extraction
+- `AppData.kt`: installed apps and icon extraction
+- `SystemInfo.kt`: Wi-Fi, TV inputs, accounts, default-Home check
+- `Model.kt`: settings, wallpapers, shapes
+- `AndroidManifest.xml`: permissions and the launcher/Home entries
+- `unwind_icon.png`, `unwind_banner.png`: app icon and TV banner
+- `wp_*.jpg`: stock wallpapers
+- `shot_*.png`: screenshots used in this README
+- the Gradle files: `app-build.gradle.kts`, `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`, `proguard-rules.pro`
 
 ## Tech
 
-Kotlin 1.9, Jetpack Compose (BOM 2024.06), Material 3 with extended icons, Android Gradle Plugin 8.5, Gradle 8.7, JDK 17. minSdk 24, targetSdk 34. No `androidx.tv` dependency.
+Kotlin 1.9 and Jetpack Compose (BOM 2024.06), Material 3 with extended icons, Android Gradle Plugin 8.5, Gradle 8.7, JDK 17. minSdk 24, targetSdk 34. No `androidx.tv` dependency.
 
-## Limitations
+## Known problems
 
-- **Home button:** some TVs (including some Xiaomi models) lock the Home button to their own home screen. Unwind still works as an app there.
-- **Icon theming:** a few unusual icons can't be separated from their background and are shown as two-tone chips.
-- **Switching inputs:** works through the TV's own Live TV app, so it varies by brand.
-- **Phone apps:** sideloaded phone apps are built for touch, so some can be hard to use with a remote.
-- **Signing:** the APKs are signed with a debug key, which is fine for sideloading.
+- Some TVs, including some Xiaomi models, lock the Home button to their own home screen. Unwind still works as an app there.
+- A few unusual icons can't be separated from their background, so they show as two-tone chips.
+- Switching inputs goes through the TV's own Live TV app, so how well it works depends on the brand.
+- Sideloaded phone apps are built for touch, and some are hard to use with a remote.
 
-## Ideas for later
+## Maybe later
 
-- Reorder pinned apps
+- Reordering pinned apps
 - More glass and icon styles
-- Dock and top-bar layout options
+- Dock and top bar layout options
 
 ## License
 

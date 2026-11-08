@@ -25,7 +25,6 @@ Same home screen, two wallpapers, two glass styles. The colors change on their o
   </tr>
   <tr>
     <td><img src="shot_home_liquid_amber.png" alt="Liquid Glass, amber wallpaper"></td>
-    <td><img src="shot_home_normal_amber.png" alt="Normal glass, amber wallpaper"></td>
   </tr>
   <tr>
     <td align="center">Liquid Glass, my own photo</td>

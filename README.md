@@ -56,6 +56,9 @@ Day to day:
 - Search is an on-screen keyboard that filters your installed apps as you type.
 - The top bar has system settings, a list of every nearby Wi-Fi network (with signal strength and band), TV inputs, the clock, and your Google account.
 - The D-pad moves between the dock, the top bar and your apps, in both directions.
+- Home layout is your call: one endless row that scrolls sideways, or rows that fill the screen width and then wrap below. Either way you can turn on a glass dock behind the first row, in whichever glass style you picked.
+- The greeting on Home (the "Rise and shine" bit) can be rewritten for morning, afternoon, evening and night from Preferences.
+- A short welcome screen shows the first time Unwind opens. You can replay it from the bottom of Preferences.
 
 ## Getting the APK
 

@@ -27,10 +27,41 @@ enum class IconStyle(val label: String, val blurb: String) {
     Original("Original", "Full-color app icons"),
 }
 
+/** How the pinned apps are laid out on Home. */
+enum class HomeLayout(val label: String, val blurb: String) {
+    Endless("Endless row", "One row, scrolls sideways"),
+    Stacked("Stacked rows", "Wraps into rows below"),
+}
+
+/** The four parts of the day that each get their own greeting. */
+enum class DayPart(val label: String, val hours: String) {
+    Morning("Morning", "5 AM to 12 PM"),
+    Afternoon("Afternoon", "12 PM to 5 PM"),
+    Evening("Evening", "5 PM to 9 PM"),
+    Night("Night", "9 PM to 5 AM"),
+}
+
+fun dayPartFor(hour: Int): DayPart = when (hour) {
+    in 5..11 -> DayPart.Morning
+    in 12..16 -> DayPart.Afternoon
+    in 17..20 -> DayPart.Evening
+    else -> DayPart.Night
+}
+
+/** The three lines on Home: a small line, a white headline and a line in the wallpaper's accent color. */
+data class Greeting(val top: String, val line1: String, val line2: String)
+
+val DEFAULT_GREETINGS: Map<DayPart, Greeting> = mapOf(
+    DayPart.Morning to Greeting("Good morning", "Rise and", "shine"),
+    DayPart.Afternoon to Greeting("Good afternoon", "Take a", "breather"),
+    DayPart.Evening to Greeting("Good evening", "Time to", "unwind"),
+    DayPart.Night to Greeting("Good night", "Time to", "unwind"),
+)
+
 /** Where the wallpaper comes from. */
 enum class WallSource { Stock, Bing, Custom }
 
-enum class Screen { Home, Apps, Edit, Search, Settings, Gallery }
+enum class Screen { Home, Apps, Edit, Search, Settings, Gallery, Greeting }
 enum class Popup { None, Wifi, Inputs, Account }
 
 private val HexShape: Shape = GenericShape { size, _ ->
@@ -79,6 +110,9 @@ data class LauncherSettings(
     val showNames: Boolean = true,
     val iconStyle: IconStyle = IconStyle.Themed,
     val glass: GlassStyle = GlassStyle.Normal,
+    val homeLayout: HomeLayout = HomeLayout.Endless,
+    val dock: Boolean = false,
+    val greetings: Map<DayPart, Greeting> = DEFAULT_GREETINGS,
 )
 
 private inline fun <reified T : Enum<T>> parseEnum(s: String?, def: T): T =
@@ -94,6 +128,13 @@ fun loadSettings(ctx: Context): LauncherSettings {
         showNames = p.getBoolean("showNames", d.showNames),
         iconStyle = parseEnum(p.getString("iconStyle", null), d.iconStyle),
         glass = parseEnum(p.getString("glass", null), d.glass),
+        homeLayout = parseEnum(p.getString("homeLayout", null), d.homeLayout),
+        dock = p.getBoolean("dock", d.dock),
+        greetings = DayPart.values().associateWith { part ->
+            val parts = p.getString("greet_${part.name}", null)?.split(GREET_SEP)
+            if (parts != null && parts.size == 3) Greeting(parts[0], parts[1], parts[2])
+            else DEFAULT_GREETINGS.getValue(part)
+        },
     )
 }
 
@@ -105,8 +146,20 @@ fun saveSettings(ctx: Context, s: LauncherSettings) {
         .putBoolean("showNames", s.showNames)
         .putString("iconStyle", s.iconStyle.name)
         .putString("glass", s.glass.name)
+        .putString("homeLayout", s.homeLayout.name)
+        .putBoolean("dock", s.dock)
+        .also { e ->
+            // Only greetings you changed are stored, so untouched ones keep following the defaults
+            for (part in DayPart.values()) {
+                val g = s.greetings[part] ?: DEFAULT_GREETINGS.getValue(part)
+                if (g == DEFAULT_GREETINGS.getValue(part)) e.remove("greet_${part.name}")
+                else e.putString("greet_${part.name}", listOf(g.top, g.line1, g.line2).joinToString(GREET_SEP))
+            }
+        }
         .apply()
 }
+
+private const val GREET_SEP = "\u001F"
 
 /** Focus targets used to wire up D-pad navigation between the dock, top bar and the page content. */
 class Nav(

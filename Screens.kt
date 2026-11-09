@@ -1,6 +1,8 @@
 package com.unwind.launcher
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,6 +12,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -71,66 +76,107 @@ import java.util.Calendar
 // ---------- Home ----------
 
 @Composable
+private fun HomeTile(app: AppEntry?, modifier: Modifier, onLaunch: (AppEntry) -> Unit, onAdd: () -> Unit) {
+    val ui = LocalUi.current
+    if (app != null) {
+        Tile(app.label, modifier, onClick = { onLaunch(app) }) { d -> AppGlyph(app, d) }
+    } else {
+        Tile("Add apps", modifier, onClick = onAdd) {
+            Icon(Icons.Rounded.Add, contentDescription = null, tint = ui.wp.accent, modifier = Modifier.size(34.dp))
+        }
+    }
+}
+
+@Composable
 fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (AppEntry) -> Unit, onAdd: () -> Unit) {
     val ui = LocalUi.current
     val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
-    val copy = when (hour) {
-        in 5..11 -> Triple("Good morning", "Rise and", "shine")
-        in 12..16 -> Triple("Good afternoon", "Take a", "breather")
-        in 17..20 -> Triple("Good evening", "Time to", "unwind")
-        else -> Triple("Good night", "Time to", "unwind")
-    }
+    val part = dayPartFor(hour)
+    val greeting = ui.settings.greetings[part] ?: DEFAULT_GREETINGS.getValue(part)
     LaunchedEffect(favApps.size, focusKick) {
         delay(200)
         runCatching { nav.content.requestFocus() }
     }
-    val shadow = TextStyle(shadow = Shadow(Color(0x66000000), blurRadius = 14f))
 
-    Column(Modifier.fillMaxSize().padding(start = 163.dp, top = 140.dp, bottom = 78.dp)) {
-        Text(copy.first, color = Color.White.copy(alpha = 0.92f), fontSize = 15.sp, style = shadow)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            copy.second,
-            color = Color.White,
-            fontSize = 54.sp,
-            lineHeight = 56.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = FontFamily.SansSerif,
-            letterSpacing = (-1).sp,
-            style = shadow,
-        )
-        Text(
-            copy.third,
-            color = ui.wp.accent,
-            fontSize = 54.sp,
-            lineHeight = 56.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = FontFamily.SansSerif,
-            letterSpacing = (-1).sp,
-            style = shadow,
-        )
-        Spacer(Modifier.weight(1f))
-        // vertical padding leaves room for the focused tile to swell without being clipped
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(top = 18.dp, bottom = 18.dp, end = 48.dp),
-        ) {
-            itemsIndexed(favApps, key = { _, a -> a.pkg }) { i, app ->
-                Tile(
-                    app.label,
-                    (if (i == 0) Modifier.focusRequester(nav.content) else Modifier)
-                        .dpad(left = if (i == 0) nav.rail else null, up = nav.pill),
-                    onClick = { onLaunch(app) },
-                ) { d -> AppGlyph(app, d) }
-            }
-            item {
-                Tile(
-                    "Add apps",
-                    (if (favApps.isEmpty()) Modifier.focusRequester(nav.content) else Modifier)
-                        .dpad(left = if (favApps.isEmpty()) nav.rail else null, up = nav.pill),
-                    onClick = onAdd,
+    val stacked = ui.settings.homeLayout == HomeLayout.Stacked
+    val dock = ui.settings.dock
+    val dockShape = RoundedCornerShape(34.dp)
+    val dockPad = 18.dp
+    // the "Add apps" tile is the last item in the flow
+    val items: List<AppEntry?> = favApps + null
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // How many tiles fit across, worked out from the screen so it adapts to any TV
+        val tileW = 86.dp
+        val gap = 16.dp
+        val usable = maxWidth - 163.dp - 48.dp - (if (dock) dockPad * 2 else 0.dp)
+        val cols = maxOf(1, ((usable + gap) / (tileW + gap)).toInt())
+        val rows = items.chunked(cols)
+        val tall = stacked && rows.size > 1
+        val topPad by animateDpAsState(if (tall) 104.dp else 140.dp, label = "homeTop")
+        val bottomPad by animateDpAsState(if (tall) 28.dp else 78.dp, label = "homeBottom")
+
+        Column(Modifier.fillMaxSize().padding(start = 163.dp, top = topPad, bottom = bottomPad)) {
+            GreetingText(greeting)
+            if (!stacked) {
+                Spacer(Modifier.weight(1f))
+                // Endless row. With the dock on, the glass bar stays put and the apps slide across it.
+                Box(
+                    if (dock) Modifier.padding(end = 24.dp).offset(x = -dockPad).glass(dockShape) else Modifier,
                 ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, tint = ui.wp.accent, modifier = Modifier.size(34.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(gap),
+                        // vertical padding leaves room for the focused tile to swell without being clipped
+                        contentPadding = PaddingValues(
+                            start = if (dock) dockPad else 0.dp,
+                            top = 18.dp,
+                            bottom = 18.dp,
+                            end = if (dock) dockPad else 48.dp,
+                        ),
+                    ) {
+                        itemsIndexed(items, key = { _, a -> a?.pkg ?: "__add" }) { i, app ->
+                            HomeTile(
+                                app,
+                                (if (i == 0) Modifier.focusRequester(nav.content) else Modifier)
+                                    .dpad(left = if (i == 0) nav.rail else null, up = nav.pill),
+                                onLaunch,
+                                onAdd,
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Stacked rows: the first row fills the width, then apps continue in rows below it.
+                // The whole block starts a little to the left so the dock bar and the focus swell have room.
+                val side = if (dock) dockPad else 14.dp
+                Box(
+                    Modifier.weight(1f).fillMaxWidth().offset(x = -side),
+                    contentAlignment = Alignment.BottomStart,
+                ) {
+                    Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 18.dp)) {
+                        rows.forEachIndexed { ri, row ->
+                            if (ri > 0) Spacer(Modifier.height(14.dp))
+                            Row(
+                                if (ri == 0 && dock) {
+                                    Modifier.glass(dockShape).padding(horizontal = dockPad, vertical = 14.dp)
+                                } else {
+                                    Modifier.padding(start = side)
+                                },
+                                horizontalArrangement = Arrangement.spacedBy(gap),
+                            ) {
+                                row.forEachIndexed { ci, app ->
+                                    val isFirst = ri == 0 && ci == 0
+                                    HomeTile(
+                                        app,
+                                        (if (isFirst) Modifier.focusRequester(nav.content) else Modifier)
+                                            .dpad(left = if (ci == 0) nav.rail else null, up = if (ri == 0) nav.pill else null),
+                                        onLaunch,
+                                        onAdd,
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -187,7 +233,7 @@ fun AppGrid(
 // ---------- In-launcher app search ----------
 
 @Composable
-private fun KeyCap(label: String, w: Dp, modifier: Modifier, onClick: () -> Unit) {
+fun KeyCap(label: String, w: Dp, modifier: Modifier, active: Boolean = false, onClick: () -> Unit) {
     val ui = LocalUi.current
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.08f else 1f, animationSpec = LiquidSpring, label = "key")
@@ -204,7 +250,7 @@ private fun KeyCap(label: String, w: Dp, modifier: Modifier, onClick: () -> Unit
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = if (focused) ui.wp.accent else Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = if (focused || active) ui.wp.accent else Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -280,7 +326,7 @@ fun SearchScreen(apps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (AppE
 // ---------- Shared bits for the settings pages ----------
 
 @Composable
-private fun OptionCard(
+fun OptionCard(
     selected: Boolean,
     w: Dp,
     h: Dp,
@@ -313,7 +359,7 @@ private fun OptionCard(
 }
 
 @Composable
-private fun SectionTitle(title: String, sub: String) {
+fun SectionTitle(title: String, sub: String) {
     val ui = LocalUi.current
     Text(title, color = ui.wp.accent, fontSize = 17.sp, fontWeight = FontWeight.Medium)
     Text(sub, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
@@ -321,7 +367,7 @@ private fun SectionTitle(title: String, sub: String) {
 }
 
 @Composable
-private fun ActionCard(label: String, modifier: Modifier = Modifier, w: Dp = 240.dp, onClick: () -> Unit) {
+fun ActionCard(label: String, modifier: Modifier = Modifier, w: Dp = 240.dp, onClick: () -> Unit) {
     OptionCard(selected = false, w = w, h = 52.dp, modifier = modifier, onClick = onClick) {
         Box(Modifier.fillMaxSize().glass(RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
             Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
@@ -374,6 +420,55 @@ private fun GuideStep(n: Int, text: String) {
     }
 }
 
+@Composable
+private fun ToggleCard(label: String, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val ui = LocalUi.current
+    OptionCard(selected = false, w = 260.dp, h = 56.dp, modifier = modifier, onClick = onClick) {
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Box(
+                Modifier
+                    .size(48.dp, 26.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(if (on) ui.wp.accent else Color.White.copy(alpha = 0.28f)),
+            ) {
+                Box(
+                    Modifier
+                        .align(if (on) Alignment.CenterEnd else Alignment.CenterStart)
+                        .padding(3.dp)
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(if (on) ui.wp.dark else Color.White),
+                )
+            }
+        }
+    }
+}
+
+/** A tiny drawing of the layout: one row fading off to the side, or rows wrapping below. */
+@Composable
+private fun LayoutGlyph(stacked: Boolean) {
+    val ui = LocalUi.current
+    val c = ui.wp.accent
+    Canvas(Modifier.size(52.dp, 28.dp)) {
+        val r = 5.dp.toPx()
+        val g = 4.dp.toPx()
+        if (stacked) {
+            for (row in 0..1) for (col in 0..3) {
+                drawCircle(c.copy(alpha = if (row == 0) 1f else 0.6f), r, Offset(r + col * (2 * r + g), r + row * (2 * r + g)))
+            }
+        } else {
+            for (col in 0..3) {
+                drawCircle(c.copy(alpha = if (col == 3) 0.35f else 1f), r, Offset(r + col * (2 * r + g), size.height / 2f))
+            }
+        }
+    }
+}
+
 // ---------- Preferences ----------
 
 @Composable
@@ -386,6 +481,8 @@ fun SettingsScreen(
     onChange: (LauncherSettings) -> Unit,
     onPickCustom: () -> Unit,
     onOpenHomeSettings: () -> Unit,
+    onEditGreeting: (DayPart) -> Unit,
+    onReplayIntro: () -> Unit,
 ) {
     val ui = LocalUi.current
     val ctx = LocalContext.current
@@ -516,35 +613,73 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(24.dp))
 
+        // Home layout
+        SectionTitle("Home layout", "How your pinned apps sit on Home")
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            HomeLayout.values().forEachIndexed { li, l ->
+                OptionCard(
+                    selected = settings.homeLayout == l,
+                    w = 260.dp,
+                    h = 72.dp,
+                    modifier = if (li == 0) toRail else Modifier,
+                    onClick = { onChange(settings.copy(homeLayout = l)) },
+                ) {
+                    Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        LayoutGlyph(l == HomeLayout.Stacked)
+                        Spacer(Modifier.width(14.dp))
+                        Column {
+                            Text(l.label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text(l.blurb, color = Color.White.copy(alpha = 0.75f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        // Dock
+        SectionTitle("Dock", "Put the first row on a glass bar, in your chosen glass style")
+        ToggleCard(if (settings.dock) "Dock on" else "Dock off", settings.dock, toRail) {
+            onChange(settings.copy(dock = !settings.dock))
+        }
+        Spacer(Modifier.height(24.dp))
+
         // App names
         SectionTitle("App names", "Show the name under each icon on Home")
-        OptionCard(
-            selected = false,
-            w = 260.dp,
-            h = 56.dp,
-            modifier = toRail,
-            onClick = { onChange(settings.copy(showNames = !settings.showNames)) },
-        ) {
-            Row(
-                Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(if (settings.showNames) "Names on" else "Names off", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                Box(
-                    Modifier
-                        .size(48.dp, 26.dp)
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(if (settings.showNames) ui.wp.accent else Color.White.copy(alpha = 0.28f)),
+        ToggleCard(if (settings.showNames) "Names on" else "Names off", settings.showNames, toRail) {
+            onChange(settings.copy(showNames = !settings.showNames))
+        }
+        Spacer(Modifier.height(24.dp))
+
+        // Greetings
+        SectionTitle("Greetings", "Change the words on Home for each part of the day")
+        val nowPart = dayPartFor(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            DayPart.values().forEachIndexed { gi, dp ->
+                val g = settings.greetings[dp] ?: DEFAULT_GREETINGS.getValue(dp)
+                OptionCard(
+                    selected = dp == nowPart,
+                    w = 180.dp,
+                    h = 84.dp,
+                    modifier = if (gi == 0) toRail else Modifier,
+                    onClick = { onEditGreeting(dp) },
                 ) {
-                    Box(
-                        Modifier
-                            .align(if (settings.showNames) Alignment.CenterEnd else Alignment.CenterStart)
-                            .padding(3.dp)
-                            .size(20.dp)
-                            .clip(CircleShape)
-                            .background(if (settings.showNames) ui.wp.dark else Color.White),
-                    )
+                    Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 14.dp)) {
+                        Text(
+                            if (dp == nowPart) "${dp.label} \u00B7 now" else dp.label,
+                            color = ui.wp.accent,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            "${g.line1} ${g.line2}".trim().ifEmpty { g.top },
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(dp.hours, color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
+                    }
                 }
             }
         }
@@ -566,6 +701,11 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(12.dp))
         ActionCard("Open Home settings", toRail, 240.dp, onOpenHomeSettings)
+        Spacer(Modifier.height(24.dp))
+
+        // Welcome screen
+        SectionTitle("Welcome screen", "See the intro that shows the first time Unwind opens")
+        ActionCard("Replay welcome screen", toRail, 240.dp, onReplayIntro)
     }
 }
 

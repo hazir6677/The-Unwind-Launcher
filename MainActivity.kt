@@ -12,7 +12,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -127,6 +130,9 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     var wifi by remember { mutableStateOf<WifiState?>(null) }
     var acct by remember { mutableStateOf<AcctState?>(null) }
     var inputs by remember { mutableStateOf(emptyList<InputItem>()) }
+    // The welcome screen shows the very first time Unwind opens (and again from Preferences)
+    var showIntro by remember { mutableStateOf(!prefs.getBoolean("introSeen", false)) }
+    var greetPart by remember { mutableStateOf(DayPart.Morning) }
 
     val wp = wall?.wp ?: WALLPAPERS[settings.wallpaper.coerceIn(0, WALLPAPERS.lastIndex)]
     val storagePerm = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES
@@ -286,7 +292,7 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     }
 
     BackHandler(enabled = screen != Screen.Home) {
-        screen = if (screen == Screen.Gallery) Screen.Settings else Screen.Home
+        screen = if (screen == Screen.Gallery || screen == Screen.Greeting) Screen.Settings else Screen.Home
     }
     // When Unwind is the Home app, Back on the Home page does nothing (it shouldn't close the launcher)
     BackHandler(enabled = isHome && screen == Screen.Home && popup == Popup.None) { }
@@ -297,7 +303,7 @@ fun LauncherApp(tick: Int, homeTick: Int) {
         Screen.Home -> 0
         Screen.Search -> 1
         Screen.Apps, Screen.Edit -> 2
-        Screen.Settings, Screen.Gallery -> 3
+        Screen.Settings, Screen.Gallery, Screen.Greeting -> 3
     }
     val nav = Nav(contentReq, pillReq, railReqs[railSel])
     val title = when (screen) {
@@ -305,14 +311,14 @@ fun LauncherApp(tick: Int, homeTick: Int) {
         Screen.Search -> "Search"
         Screen.Apps -> "Apps"
         Screen.Edit -> "Favorites"
-        Screen.Settings, Screen.Gallery -> "Preferences"
+        Screen.Settings, Screen.Gallery, Screen.Greeting -> "Preferences"
     }
     val scrimA = (0.45f + 0.35f * wp.luma).coerceIn(0.45f, 0.85f)
 
     Box(Modifier.fillMaxSize().background(Color.Black).onSizeChanged { rootSize = it }) {
         CompositionLocalProvider(LocalUi provides ui) {
             // While a popup is open, nothing behind it can take focus.
-            Box(Modifier.fillMaxSize().focusProperties { canFocus = popup == Popup.None }) {
+            Box(Modifier.fillMaxSize().focusProperties { canFocus = popup == Popup.None && !showIntro }) {
                 WallpaperLayer(wall)
                 // Soft scrims keep text readable on any wallpaper (stronger on bright pictures)
                 Box(
@@ -352,6 +358,18 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                             }
                         },
                         onOpenHomeSettings = { openHomeSettings(ctx) },
+                        onEditGreeting = { greetPart = it; screen = Screen.Greeting },
+                        onReplayIntro = { showIntro = true },
+                    )
+                    Screen.Greeting -> GreetingEditor(
+                        part = greetPart,
+                        initial = settings.greetings[greetPart] ?: DEFAULT_GREETINGS.getValue(greetPart),
+                        nav = nav,
+                        onSave = { g ->
+                            updateSettings(settings.copy(greetings = settings.greetings + (greetPart to g)))
+                            screen = Screen.Settings
+                        },
+                        onCancel = { screen = Screen.Settings },
                     )
                     Screen.Gallery -> GalleryScreen(
                         items = gallery,
@@ -433,6 +451,16 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                         Popup.None -> {}
                     }
                 }
+            }
+
+            AnimatedVisibility(visible = showIntro, enter = fadeIn(tween(400)), exit = fadeOut(tween(600))) {
+                IntroScreen(
+                    onDone = {
+                        prefs.edit().putBoolean("introSeen", true).apply()
+                        showIntro = false
+                        focusKick++
+                    },
+                )
             }
         }
     }

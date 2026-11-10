@@ -29,11 +29,29 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.7
+      - name: Restore signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.UNWIND_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/unwind.jks"
+            echo "UNWIND_KEYSTORE_PATH=$RUNNER_TEMP/unwind.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No signing key secret found. This APK will NOT install over an older one."
+          fi
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
+        env:
+          UNWIND_KEYSTORE_PASSWORD: ${{ secrets.UNWIND_KEYSTORE_PASSWORD }}
+          UNWIND_KEY_ALIAS: ${{ secrets.UNWIND_KEY_ALIAS }}
+          UNWIND_KEY_PASSWORD: ${{ secrets.UNWIND_KEY_PASSWORD }}
       - name: Build release APK (smoother)
         run: gradle assembleRelease --no-daemon
         continue-on-error: true
+        env:
+          UNWIND_KEYSTORE_PASSWORD: ${{ secrets.UNWIND_KEYSTORE_PASSWORD }}
+          UNWIND_KEY_ALIAS: ${{ secrets.UNWIND_KEY_ALIAS }}
+          UNWIND_KEY_PASSWORD: ${{ secrets.UNWIND_KEY_PASSWORD }}
       - uses: actions/upload-artifact@v4
         with:
           name: unwind-launcher-apk

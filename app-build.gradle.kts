@@ -3,6 +3,10 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// A fixed signing key (kept in GitHub Secrets) is what lets each new APK install OVER the old one.
+// Without it, every build gets a throwaway key and Android refuses to update the installed app.
+val keystorePath: String? = System.getenv("UNWIND_KEYSTORE_PATH")
+
 android {
     namespace = "com.unwind.launcher"
     compileSdk = 34
@@ -11,18 +15,32 @@ android {
         applicationId = "com.unwind.launcher"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "2.1"
+        // Goes up by one on every GitHub build, so Android always sees the new APK as an update
+        versionCode = 100 + (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0)
+        versionName = "2.2"
+    }
+
+    signingConfigs {
+        if (keystorePath != null && file(keystorePath).exists()) {
+            create("unwind") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("UNWIND_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("UNWIND_KEY_ALIAS")
+                keyPassword = System.getenv("UNWIND_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfigs.findByName("unwind")?.let { signingConfig = it }
+        }
         release {
             // The release build is much smoother than the debug build, so this is the APK to install.
             isMinifyEnabled = true
             isShrinkResources = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Signed with the standard debug key so it installs without any extra setup.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("unwind") ?: signingConfigs.getByName("debug")
         }
     }
 

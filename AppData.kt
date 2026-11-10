@@ -25,6 +25,7 @@ class AppEntry(
     val icon: ImageBitmap,  // full-color icon, pre-scaled to the size it's drawn at
     val mask: ImageBitmap?, // white glyph with alpha, cropped tight; null when no clean glyph could be isolated
     val bg: Color,          // the icon's own background color (Transparent if it has none)
+    val folder: String = "Other", // automatic folder, from the app's category
 )
 
 /** Icons are expensive to analyze, so each one is built once per app launch of the launcher. */
@@ -50,10 +51,56 @@ fun loadApps(ctx: Context): List<AppEntry> {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             val key = "$pkg/${ri.activityInfo.name}@$maskPx"
             val built = builtFor(key, { ri.loadIcon(pm) }, maskPx, iconPx)
-            out[pkg] = AppEntry(pkg, ri.loadLabel(pm).toString(), launch, built.icon, built.mask, built.bg)
+            out[pkg] = AppEntry(
+                pkg, ri.loadLabel(pm).toString(), launch, built.icon, built.mask, built.bg,
+                folderFor(ri.activityInfo.applicationInfo, pkg),
+            )
         }
     }
     return out.values.sortedBy { it.label.lowercase() }
+}
+
+// ---------- Automatic folders ----------
+
+/** The folders, in the order they appear. "Other" catches anything that doesn't fit. */
+val FOLDER_ORDER = listOf("Video", "Music", "Games", "Social", "News", "Photos", "Productivity", "Other")
+
+private val VIDEO_HINTS = listOf(
+    "netflix", "youtube", "hotstar", "amazonvideo", "primevideo", "jio.media", "atve", "plex", "kodi",
+    "disney", "hbo", "sonyliv", "zee5", "mxtech", "vlc", "twitch", "tubi", "hulu", "tv.player", "livingroom",
+)
+private val MUSIC_HINTS = listOf("music", "spotify", "audio", "podcast", "saavn", "gaana", "wynk", "deezer", "tidal", "radio")
+private val SOCIAL_HINTS = listOf("facebook", "instagram", "twitter", "whatsapp", "telegram", "snapchat", "reddit")
+private val PHOTO_HINTS = listOf("photos", "gallery", "camera")
+private val PRODUCTIVITY_HINTS = listOf("docs", "office", "drive", "sheets", "slides", "calendar", "keep", "notes")
+
+/** Uses the category the app declares. Many TV apps declare none, so common ones are matched by name. */
+@Suppress("DEPRECATION")
+fun folderFor(ai: android.content.pm.ApplicationInfo, pkg: String): String {
+    if (Build.VERSION.SDK_INT >= 26) {
+        when (ai.category) {
+            android.content.pm.ApplicationInfo.CATEGORY_VIDEO -> return "Video"
+            android.content.pm.ApplicationInfo.CATEGORY_AUDIO -> return "Music"
+            android.content.pm.ApplicationInfo.CATEGORY_GAME -> return "Games"
+            android.content.pm.ApplicationInfo.CATEGORY_SOCIAL -> return "Social"
+            android.content.pm.ApplicationInfo.CATEGORY_NEWS -> return "News"
+            android.content.pm.ApplicationInfo.CATEGORY_IMAGE -> return "Photos"
+            android.content.pm.ApplicationInfo.CATEGORY_PRODUCTIVITY -> return "Productivity"
+            else -> {}
+        }
+    }
+    if ((ai.flags and android.content.pm.ApplicationInfo.FLAG_IS_GAME) != 0) return "Games"
+    val p = pkg.lowercase()
+    return when {
+        p.contains("game") -> "Games"
+        MUSIC_HINTS.any { p.contains(it) } -> "Music"
+        VIDEO_HINTS.any { p.contains(it) } -> "Video"
+        SOCIAL_HINTS.any { p.contains(it) } -> "Social"
+        p.contains("news") -> "News"
+        PHOTO_HINTS.any { p.contains(it) } -> "Photos"
+        PRODUCTIVITY_HINTS.any { p.contains(it) } -> "Productivity"
+        else -> "Other"
+    }
 }
 
 fun tryStart(ctx: Context, vararg intents: Intent) {

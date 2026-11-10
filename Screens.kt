@@ -114,7 +114,12 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
         val rows = items.chunked(cols)
         val tall = stacked && rows.size > 1
         val topPad by animateDpAsState(if (tall) 104.dp else 140.dp, label = "homeTop")
-        val bottomPad by animateDpAsState(if (tall) 28.dp else 78.dp, label = "homeBottom")
+        // Dock height setting: how far the row sits above the bottom edge
+        val lift = 78 - ui.settings.dockPos.bottom
+        val bottomPad by animateDpAsState(
+            if (tall) maxOf(8, 28 - lift / 2).dp else ui.settings.dockPos.bottom.dp,
+            label = "homeBottom",
+        )
 
         Column(Modifier.fillMaxSize().padding(start = 163.dp, top = topPad, bottom = bottomPad)) {
             GreetingText(greeting)
@@ -523,7 +528,7 @@ fun SettingsScreen(
         SectionTitle("Wallpaper", "Icons and glass pick up its colors, whatever picture you choose")
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             WallCard(
-                "Bing daily", bingThumb, "Daily", isBing,
+                "Daily wallpaper", bingThumb, "Daily", isBing,
                 (if (isBing) Modifier.focusRequester(nav.content) else Modifier).dpad(left = nav.rail, up = nav.pill),
             ) { onChange(settings.copy(wallSource = WallSource.Bing)) }
             WallCard(
@@ -641,6 +646,49 @@ fun SettingsScreen(
         SectionTitle("Dock", "Put the first row on a glass bar, in your chosen glass style")
         ToggleCard(if (settings.dock) "Dock on" else "Dock off", settings.dock, toRail) {
             onChange(settings.copy(dock = !settings.dock))
+        }
+        Spacer(Modifier.height(24.dp))
+
+        // Dock height
+        SectionTitle("Dock height", "How close to the bottom of the screen the home row sits")
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            DockPos.values().forEachIndexed { di, d ->
+                OptionCard(
+                    selected = settings.dockPos == d,
+                    w = 140.dp,
+                    h = 56.dp,
+                    modifier = if (di == 0) toRail else Modifier,
+                    onClick = { onChange(settings.copy(dockPos = d)) },
+                ) {
+                    Text(
+                        d.label,
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        // All apps view
+        SectionTitle("All apps page", "List every app, or sort them into folders by type (hold OK on an app to move it)")
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            AppsView.values().forEachIndexed { ai, v ->
+                OptionCard(
+                    selected = settings.appsView == v,
+                    w = 260.dp,
+                    h = 64.dp,
+                    modifier = if (ai == 0) toRail else Modifier,
+                    onClick = { onChange(settings.copy(appsView = v)) },
+                ) {
+                    Column(Modifier.align(Alignment.CenterStart).padding(start = 16.dp, end = 10.dp)) {
+                        Text(v.label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(v.blurb, color = Color.White.copy(alpha = 0.75f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(24.dp))
 

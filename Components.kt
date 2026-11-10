@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.IntOffset
@@ -196,16 +197,48 @@ fun Tile(
     highlight: Boolean = false,
     onFocus: () -> Unit = {},
     forceName: Boolean = false,
+    onLongPress: (() -> Unit)? = null,
     content: @Composable BoxScope.(Dp) -> Unit,
 ) {
     val ui = LocalUi.current
     var focused by remember { mutableStateOf(false) }
+    var longFired by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.14f else 1f, animationSpec = LiquidSpring, label = "tile")
     val d = 76.dp
     Column(
         modifier
             .width(d + 10.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
+            .then(
+                if (onLongPress == null) {
+                    Modifier
+                } else {
+                    // Holding OK on the remote counts as a long press. The release after it must not also open the app.
+                    Modifier.onPreviewKeyEvent { e ->
+                        val ok = e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter
+                        if (!ok) {
+                            false
+                        } else if (e.type == KeyEventType.KeyDown) {
+                            val repeat = e.nativeKeyEvent.repeatCount
+                            if (repeat == 0) longFired = false
+                            if (repeat >= 1) {
+                                if (!longFired) {
+                                    longFired = true
+                                    onLongPress()
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        } else if (e.type == KeyEventType.KeyUp && longFired) {
+                            longFired = false
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                },
+            )
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocus()

@@ -43,7 +43,7 @@ And the Preferences page, where you pick the wallpaper, glass style and icon sha
 
 There are three glass styles: Liquid Glass, Normal and Frost Glass. Normal is a tinted, softly blurred panel. Frost Glass is a heavier, milkier blur. Liquid Glass is the fancy one. It bends the wallpaper at the edges the way a real piece of glass would, adds a bit of edge light and a rainbow fringe, and swells with a springy motion when you focus on it.
 
-For wallpapers you can use one of the six that come with it, the Bing image of the day, or your own picture from the TV or a USB drive.
+For wallpapers you can use one of the six that come with it, the daily wallpaper, or your own picture from the TV or a USB drive.
 
 App icons get recolored to match the wallpaper. The logo is pulled off its background at high resolution and tinted. If an icon can't be separated cleanly, it shows up as a two-tone chip so it still fits in. You can switch to Original if you'd rather have the full-color icons. Icon shapes are Circle, Squircle, Rounded and Hexagon, and you can hide the app names on Home.
 
@@ -52,11 +52,11 @@ The top-left corner always tells you where you are: Home, Search, Apps, Favorite
 Day to day:
 
 - Home has a row of pinned apps, plus an Add apps tile for choosing them.
-- The All apps grid includes sideloaded phone apps like Google Photos, which most TV launchers hide.
+- The All apps page includes sideloaded phone apps like Google Photos, which most TV launchers hide. In Preferences you can switch it to folders (Video, Music, Games and so on, sorted by each app's category). Hold OK on an app inside a folder to move it somewhere else.
 - Search is an on-screen keyboard that filters your installed apps as you type.
 - The top bar has system settings, a list of every nearby Wi-Fi network (with signal strength and band), TV inputs, the clock, and your Google account.
 - The D-pad moves between the dock, the top bar and your apps, in both directions.
-- Home layout is your call: one endless row that scrolls sideways, or rows that fill the screen width and then wrap below. Either way you can turn on a glass dock behind the first row, in whichever glass style you picked.
+- Home layout is your call: one endless row that scrolls sideways, or rows that fill the screen width and then wrap below. Either way you can turn on a glass dock behind the first row, in whichever glass style you picked, and set how low the dock sits on the screen.
 - The greeting on Home (the "Rise and shine" bit) can be rewritten for morning, afternoon, evening and night from Preferences.
 - A short welcome screen shows the first time Unwind opens. You can replay it from the bottom of Preferences.
 
@@ -64,7 +64,7 @@ Day to day:
 
 Download the latest `app-debug.apk` from the [Releases page](https://github.com/hazir6677/The-Unwind-Launcher/releases) and sideload it onto your TV.
 
-The APK is signed with a debug key. That's fine for sideloading, it just means it won't go on the Play Store as is.
+The APK is signed with a fixed key that lives in this repo's GitHub Secrets (never in the code), so each new build installs over the old one and keeps your settings. It's a personal sideload key, so it won't go on the Play Store as is.
 
 ## Making it your Home screen
 
@@ -90,7 +90,7 @@ The pill in the top right has the same search shortcut, a gear for Android syste
 
 ## Preferences
 
-- Wallpaper: Bing daily, My photo, or one of the six stock wallpapers
+- Wallpaper: Daily wallpaper, My photo, or one of the six stock wallpapers
 - Glass style: Liquid Glass, Normal, Frost Glass
 - Icon shape: Circle, Squircle, Rounded, Hexagon
 - Icon style: Themed or Original
@@ -99,11 +99,11 @@ The pill in the top right has the same search shortcut, a gear for Android syste
 
 For your own picture, choose My photo, then pick from the list of pictures on the TV or USB drive (or tap Browse files). The picture gets copied into the launcher, so it stays even if you delete the original. Tap My photo again any time to choose a different one.
 
-Bing daily needs internet. It checks when the launcher opens and every half hour after that, and only downloads when there's a new picture.
+Daily wallpaper needs internet. It checks when the launcher opens and every half hour after that, and only downloads when there's a new picture.
 
 ## Permissions
 
-- Internet: to download the Bing picture of the day.
+- Internet: to download the daily wallpaper.
 - Location and Wi-Fi state: Android won't let an app list nearby Wi-Fi networks without location access. Nothing is stored or sent anywhere.
 - Pictures and storage: only to show your pictures when you pick a wallpaper. It asks the first time you open the picker.
 - Accounts and contacts: only to show which Google account is signed in.
@@ -133,7 +133,7 @@ Kotlin 1.9 and Jetpack Compose (BOM 2024.06), Material 3 with extended icons, An
 
 - Reordering pinned apps
 - More glass and icon styles
-- Dock and top bar layout options
+- Top bar layout options
 
 ## License
 

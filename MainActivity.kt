@@ -133,6 +133,10 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     // The welcome screen shows the very first time Unwind opens (and again from Preferences)
     var showIntro by remember { mutableStateOf(!prefs.getBoolean("introSeen", false)) }
     var greetPart by remember { mutableStateOf(DayPart.Morning) }
+    var folderMap by remember { mutableStateOf(loadFolderMap(prefs)) }
+    var openFolder by remember { mutableStateOf<String?>(null) }
+    var moveApp by remember { mutableStateOf<AppEntry?>(null) }
+    val moveFocus = remember { FocusRequester() }
 
     val wp = wall?.wp ?: WALLPAPERS[settings.wallpaper.coerceIn(0, WALLPAPERS.lastIndex)]
     val storagePerm = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES
@@ -203,12 +207,12 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     // Bing image of the day: check when opened and then every half hour while the launcher is up
     LaunchedEffect(settings.wallSource, tick) {
         if (settings.wallSource == WallSource.Bing) {
-            if (wallStatus.isBlank()) wallStatus = "Checking Bing..."
+            if (wallStatus.isBlank()) wallStatus = "Checking for today's wallpaper..."
             while (true) {
                 val r = withContext(Dispatchers.IO) { refreshBing(ctx) }
                 wallStatus = when {
                     !r.ok -> r.message
-                    r.message.isBlank() -> "Bing image of the day"
+                    r.message.isBlank() -> "Today's wallpaper"
                     else -> "Today: ${r.message}"
                 }
                 if (r.changed) wallVersion++
@@ -294,9 +298,26 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     BackHandler(enabled = screen != Screen.Home) {
         screen = if (screen == Screen.Gallery || screen == Screen.Greeting) Screen.Settings else Screen.Home
     }
+    // Inside a folder, Back goes to the folder list first
+    BackHandler(enabled = screen == Screen.Apps && openFolder != null && settings.appsView == AppsView.Folders) {
+        openFolder = null
+        focusKick++
+    }
+    BackHandler(enabled = moveApp != null) { moveApp = null }
     // When Unwind is the Home app, Back on the Home page does nothing (it shouldn't close the launcher)
     BackHandler(enabled = isHome && screen == Screen.Home && popup == Popup.None) { }
     BackHandler(enabled = popup != Popup.None) { closePopup() }
+
+    LaunchedEffect(screen) {
+        if (screen != Screen.Apps) openFolder = null
+    }
+
+    fun moveTo(app: AppEntry, folder: String?) {
+        val next = if (folder == null || folder == app.folder) folderMap - app.pkg else folderMap + (app.pkg to folder)
+        folderMap = next
+        saveFolderMap(prefs, next)
+        moveApp = null
+    }
 
     val ui = UiCtx(settings, wp, backdrops, rootSize)
     val railSel = when (screen) {
@@ -318,7 +339,7 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     Box(Modifier.fillMaxSize().background(Color.Black).onSizeChanged { rootSize = it }) {
         CompositionLocalProvider(LocalUi provides ui) {
             // While a popup is open, nothing behind it can take focus.
-            Box(Modifier.fillMaxSize().focusProperties { canFocus = popup == Popup.None && !showIntro }) {
+            Box(Modifier.fillMaxSize().focusProperties { canFocus = popup == Popup.None && !showIntro && moveApp == null }) {
                 WallpaperLayer(wall)
                 // Soft scrims keep text readable on any wallpaper (stronger on bright pictures)
                 Box(
@@ -340,7 +361,20 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                         onLaunch = { launchApp(ctx, it) },
                         onAdd = { screen = Screen.Edit },
                     )
-                    Screen.Apps -> AppGrid(apps, false, favPkgs.toSet(), focusKick, nav) { launchApp(ctx, it) }
+                    Screen.Apps -> if (settings.appsView == AppsView.Folders) {
+                        AppFolders(
+                            apps = apps,
+                            folderMap = folderMap,
+                            openFolder = openFolder,
+                            focusKick = focusKick,
+                            nav = nav,
+                            onOpenFolder = { openFolder = it },
+                            onLaunch = { launchApp(ctx, it) },
+                            onMove = { moveApp = it },
+                        )
+                    } else {
+                        AppGrid(apps, false, favPkgs.toSet(), focusKick, nav) { launchApp(ctx, it) }
+                    }
                     Screen.Edit -> AppGrid(apps, true, favPkgs.toSet(), focusKick, nav) { toggleFav(it.pkg) }
                     Screen.Search -> SearchScreen(apps, focusKick, nav) { launchApp(ctx, it) }
                     Screen.Settings -> SettingsScreen(
@@ -451,6 +485,18 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                         Popup.None -> {}
                     }
                 }
+            }
+
+            moveApp?.let { a ->
+                MoveAppDialog(
+                    app = a,
+                    currentFolder = folderMap[a.pkg] ?: a.folder,
+                    isManual = folderMap.containsKey(a.pkg),
+                    focus = moveFocus,
+                    onPick = { moveTo(a, it) },
+                    onAuto = { moveTo(a, null) },
+                    onDismiss = { moveApp = null },
+                )
             }
 
             AnimatedVisibility(visible = showIntro, enter = fadeIn(tween(400)), exit = fadeOut(tween(600))) {

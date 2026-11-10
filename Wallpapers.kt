@@ -59,7 +59,7 @@ fun loadWallpaper(ctx: Context, s: LauncherSettings): WallData? {
     }
     return when (s.wallSource) {
         WallSource.Custom -> fromFile(customFile(ctx), "custom", "My photo") ?: stock()
-        WallSource.Bing -> fromFile(bingFile(ctx), "bing", "Bing daily") ?: stock()
+        WallSource.Bing -> fromFile(bingFile(ctx), "bing", "Daily wallpaper") ?: stock()
         WallSource.Stock -> stock()
     }
 }
@@ -287,6 +287,6 @@ fun refreshBing(ctx: Context): BingResult {
         prefs.edit().putString("bingChecked", today).putString("bingId", id).putString("bingTitle", title).apply()
         BingResult(true, changed, title)
     } catch (e: Exception) {
-        BingResult(false, false, "Couldn't reach Bing. Will try again soon.")
+        BingResult(false, false, "Couldn't fetch today's wallpaper. Will try again soon.")
     }
 }

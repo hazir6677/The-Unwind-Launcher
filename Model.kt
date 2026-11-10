@@ -33,6 +33,19 @@ enum class HomeLayout(val label: String, val blurb: String) {
     Stacked("Stacked rows", "Wraps into rows below"),
 }
 
+/** How the All apps page is laid out. */
+enum class AppsView(val label: String, val blurb: String) {
+    List("All apps", "One grid, A to Z"),
+    Folders("Folders", "Sorted by app type, like the iOS App Library"),
+}
+
+/** How close to the bottom edge the home row (the dock) sits. [bottom] is the gap in dp. */
+enum class DockPos(val label: String, val bottom: Int) {
+    Default("Default", 78),
+    Lower("Lower", 40),
+    Lowest("Lowest", 14),
+}
+
 /** The four parts of the day that each get their own greeting. */
 enum class DayPart(val label: String, val hours: String) {
     Morning("Morning", "5 AM to 12 PM"),
@@ -112,6 +125,8 @@ data class LauncherSettings(
     val glass: GlassStyle = GlassStyle.Normal,
     val homeLayout: HomeLayout = HomeLayout.Endless,
     val dock: Boolean = false,
+    val dockPos: DockPos = DockPos.Default,
+    val appsView: AppsView = AppsView.List,
     val greetings: Map<DayPart, Greeting> = DEFAULT_GREETINGS,
 )
 
@@ -130,6 +145,8 @@ fun loadSettings(ctx: Context): LauncherSettings {
         glass = parseEnum(p.getString("glass", null), d.glass),
         homeLayout = parseEnum(p.getString("homeLayout", null), d.homeLayout),
         dock = p.getBoolean("dock", d.dock),
+        dockPos = parseEnum(p.getString("dockPos", null), d.dockPos),
+        appsView = parseEnum(p.getString("appsView", null), d.appsView),
         greetings = DayPart.values().associateWith { part ->
             val parts = p.getString("greet_${part.name}", null)?.split(GREET_SEP)
             if (parts != null && parts.size == 3) Greeting(parts[0], parts[1], parts[2])
@@ -148,6 +165,8 @@ fun saveSettings(ctx: Context, s: LauncherSettings) {
         .putString("glass", s.glass.name)
         .putString("homeLayout", s.homeLayout.name)
         .putBoolean("dock", s.dock)
+        .putString("dockPos", s.dockPos.name)
+        .putString("appsView", s.appsView.name)
         .also { e ->
             // Only greetings you changed are stored, so untouched ones keep following the defaults
             for (part in DayPart.values()) {

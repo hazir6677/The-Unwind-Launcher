@@ -205,9 +205,7 @@ fun Modifier.glass(
             val bw = min(min(w, h) * 0.045f, 4.dp.toPx())
             val bandPaths = if (st == GlassStyle.Liquid) Array(5) { insetPath(shape, size, bw * (it + 1), dir, this) } else emptyArray<Path>()
             val ring = insetPath(shape, size, 1.25.dp.toPx(), dir, this)
-            val fringe = insetPath(shape, size, bw * 0.9f, dir, this)
             val hair = 1.dp.toPx()
-            val rimW = 1.5.dp.toPx()
             val focusW = 2.5.dp.toPx()
 
             onDrawBehind {
@@ -257,28 +255,7 @@ fun Modifier.glass(
                                 1f to Color.White.copy(alpha = 0.14f),
                             ),
                         )
-                        // thickness: a faint shadow where the thick rim meets the flat middle
-                        drawPath(bandPaths[2], Color.Black.copy(alpha = 0.10f), style = Stroke(width = rimW))
-                        // rainbow fringe (light splitting at the edge)
-                        drawPath(
-                            fringe,
-                            Brush.linearGradient(
-                                0f to Color(0xFF7FFFE8).copy(alpha = 0.32f),
-                                0.5f to Color.Transparent,
-                                1f to Color(0xFFFFB3F0).copy(alpha = 0.32f),
-                            ),
-                            style = Stroke(width = hair),
-                        )
-                        // specular rim
-                        drawPath(
-                            ring,
-                            Brush.linearGradient(
-                                0f to Color.White.copy(alpha = 0.95f),
-                                0.45f to Color.White.copy(alpha = 0.10f),
-                                1f to Color.White.copy(alpha = 0.65f),
-                            ),
-                            style = Stroke(width = rimW),
-                        )
+                        // No outline strokes here: the edge is defined by the lens bands alone.
                     }
                     GlassStyle.Normal -> {
                         if (bm != null) drawPath(path, backdropBrush(bm, sx, sy, 1f, cx, cy, ox, oy))

@@ -201,7 +201,10 @@ fun LauncherApp(tick: Int, homeTick: Int) {
         val w = wall
         if (w != null && rootSize.width > 0 && rootSize.height > 0) {
             val aspect = rootSize.width.toFloat() / rootSize.height
-            backdrops = withContext(Dispatchers.Default) { makeBackdrops(w.bitmap, aspect) }
+            // same scrim strength the launcher draws over the wallpaper, so the glass sees what is really behind it
+            val sa = (0.45f + 0.35f * w.wp.luma).coerceIn(0.45f, 0.85f)
+            val sw = rootSize.width
+            backdrops = withContext(Dispatchers.Default) { makeBackdrops(w.bitmap, aspect, sa, sw) }
         }
     }
     // Bing image of the day: check when opened and then every half hour while the launcher is up

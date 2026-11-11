@@ -126,8 +126,10 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
             if (!stacked) {
                 Spacer(Modifier.weight(1f))
                 // Endless row. With the dock on, the glass bar stays put and the apps slide across it.
-                Box(
-                    if (dock) Modifier.padding(end = 24.dp).offset(x = -dockPad).glass(dockShape) else Modifier,
+                OptGlass(
+                    dock,
+                    if (dock) Modifier.padding(end = 24.dp).offset(x = -dockPad) else Modifier,
+                    dockShape,
                 ) {
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(gap),
@@ -161,9 +163,10 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
                     Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 18.dp)) {
                         rows.forEachIndexed { ri, row ->
                             if (ri > 0) Spacer(Modifier.height(14.dp))
+                            OptGlass(ri == 0 && dock, Modifier, dockShape) {
                             Row(
                                 if (ri == 0 && dock) {
-                                    Modifier.glass(dockShape).padding(horizontal = dockPad, vertical = 14.dp)
+                                    Modifier.padding(horizontal = dockPad, vertical = 14.dp)
                                 } else {
                                     Modifier.padding(start = side)
                                 },
@@ -179,6 +182,7 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
                                         onAdd,
                                     )
                                 }
+                            }
                             }
                         }
                     }
@@ -242,20 +246,22 @@ fun KeyCap(label: String, w: Dp, modifier: Modifier, active: Boolean = false, on
     val ui = LocalUi.current
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.08f else 1f, animationSpec = LiquidSpring, label = "key")
-    Box(
+    GlassBox(
         modifier
             .size(w, 38.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .glass(RoundedCornerShape(10.dp), focused, blur = false)
             .onFocusChanged { focused = it.isFocused }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
             ),
+        RoundedCornerShape(10.dp),
+        focused,
+        blur = false,
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = if (focused || active) ui.wp.accent else Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = if (focused || active) inkAccent(ui.wp.accent) else inkFg(), fontSize = 14.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -275,19 +281,25 @@ fun SearchScreen(apps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (AppE
     }
     Row(Modifier.fillMaxSize().padding(start = 150.dp, top = 84.dp, end = 24.dp, bottom = 24.dp)) {
         Column(Modifier.width(392.dp)) {
+            GlassBox(
+                Modifier.fillMaxWidth().height(44.dp),
+                RoundedCornerShape(22.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
             Row(
-                Modifier.fillMaxWidth().height(44.dp).glass(RoundedCornerShape(22.dp)).padding(horizontal = 16.dp),
+                Modifier.padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Rounded.Search, contentDescription = null, tint = ui.wp.accent, modifier = Modifier.size(22.dp))
+                Icon(Icons.Rounded.Search, contentDescription = null, tint = inkAccent(ui.wp.accent), modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(10.dp))
                 Text(
                     if (query.isEmpty()) "Search your apps" else query,
-                    color = Color.White.copy(alpha = if (query.isEmpty()) 0.65f else 1f),
+                    color = inkFg(Color.White.copy(alpha = if (query.isEmpty()) 0.65f else 1f)),
                     fontSize = 16.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
             }
             Spacer(Modifier.height(14.dp))
             val rows = listOf("abcdefghi", "jklmnopqr", "stuvwxyz0", "123456789")
@@ -374,8 +386,8 @@ fun SectionTitle(title: String, sub: String) {
 @Composable
 fun ActionCard(label: String, modifier: Modifier = Modifier, w: Dp = 240.dp, onClick: () -> Unit) {
     OptionCard(selected = false, w = w, h = 52.dp, modifier = modifier, onClick = onClick) {
-        Box(Modifier.fillMaxSize().glass(RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
-            Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        GlassBox(Modifier.fillMaxSize(), RoundedCornerShape(16.dp), contentAlignment = Alignment.Center) {
+            Text(label, color = inkFg(), fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -421,7 +433,7 @@ private fun GuideStep(n: Int, text: String) {
             contentAlignment = Alignment.Center,
         ) { Text("$n", color = ui.wp.dark, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
         Spacer(Modifier.width(12.dp))
-        Text(text, color = Color.White, fontSize = 14.sp, lineHeight = 19.sp)
+        Text(text, color = inkFg(), fontSize = 14.sp, lineHeight = 19.sp)
     }
 }
 
@@ -441,14 +453,24 @@ private fun ToggleCard(label: String, on: Boolean, modifier: Modifier, onClick: 
                     .clip(RoundedCornerShape(13.dp))
                     .background(if (on) ui.wp.accent else Color.White.copy(alpha = 0.28f)),
             ) {
-                Box(
-                    Modifier
-                        .align(if (on) Alignment.CenterEnd else Alignment.CenterStart)
-                        .padding(3.dp)
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .background(if (on) ui.wp.dark else Color.White),
-                )
+                if (ui.settings.glass == GlassStyle.Liquid && ui.backdrops?.liquid != null) {
+                    // In Liquid the thumb is a small glass capsule; its middle stays clear so the track shows through
+                    GlassBox(
+                        Modifier.align(if (on) Alignment.CenterEnd else Alignment.CenterStart).padding(2.dp).size(32.dp, 22.dp),
+                        RoundedCornerShape(11.dp),
+                        strict = false,
+                        overlayOnly = true,
+                    ) {}
+                } else {
+                    Box(
+                        Modifier
+                            .align(if (on) Alignment.CenterEnd else Alignment.CenterStart)
+                            .padding(3.dp)
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(if (on) ui.wp.dark else Color.White),
+                    )
+                }
             }
         }
     }
@@ -564,10 +586,10 @@ fun SettingsScreen(
                     modifier = if (gi == 0) toRail else Modifier,
                     onClick = { onChange(settings.copy(glass = g)) },
                 ) {
-                    Box(Modifier.fillMaxSize().glass(RoundedCornerShape(16.dp), style = g), contentAlignment = Alignment.Center) {
+                    GlassBox(Modifier.fillMaxSize(), RoundedCornerShape(16.dp), style = g, contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(g.label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            Text(g.blurb, color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp)
+                            Text(g.label, color = inkFg(), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text(g.blurb, color = inkFg(Color.White.copy(alpha = 0.8f)), fontSize = 10.sp)
                         }
                     }
                 }
@@ -587,8 +609,8 @@ fun SettingsScreen(
                         modifier = if (si == 0) toRail else Modifier,
                         onClick = { onChange(settings.copy(shape = s)) },
                     ) {
-                        Box(Modifier.align(Alignment.Center).size(46.dp).glass(s.toShape()), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Rounded.Apps, contentDescription = null, tint = ui.wp.accent, modifier = Modifier.size(24.dp))
+                        GlassBox(Modifier.align(Alignment.Center).size(46.dp), s.toShape(), strict = false, contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.Apps, contentDescription = null, tint = inkAccent(ui.wp.accent), modifier = Modifier.size(24.dp))
                         }
                     }
                     Spacer(Modifier.height(6.dp))
@@ -735,17 +757,19 @@ fun SettingsScreen(
 
         // Home screen replacement guide
         SectionTitle("Make Unwind your Home screen", "So the Home button on your remote opens Unwind")
-        Column(Modifier.width(560.dp).glass(RoundedCornerShape(18.dp)).padding(horizontal = 18.dp, vertical = 14.dp)) {
+        GlassBox(Modifier.width(560.dp), RoundedCornerShape(18.dp)) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
             GuideStep(1, "Press the Home button on your remote.")
             GuideStep(2, "If the TV asks which Home app to use, pick Unwind, then choose Always.")
             GuideStep(3, "No question? Tap the button below and pick Unwind there.")
             Spacer(Modifier.height(6.dp))
             Text(
                 "To switch back: pick your TV's original Home app in the same place, or uninstall Unwind.",
-                color = Color.White.copy(alpha = 0.72f),
+                color = inkFg(Color.White.copy(alpha = 0.72f)),
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
             )
+        }
         }
         Spacer(Modifier.height(12.dp))
         ActionCard("Open Home settings", toRail, 240.dp, onOpenHomeSettings)

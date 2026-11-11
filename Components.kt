@@ -129,7 +129,11 @@ fun FocusBox(
 ) {
     val ui = LocalUi.current
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.1f else 1f, animationSpec = LiquidSpring, label = "focusBox")
+    val scale by animateFloatAsState(
+        if (focused) (if (ui.settings.glass == GlassStyle.Liquid) 1.06f else 1.1f) else 1f,
+        animationSpec = LiquidSpring,
+        label = "focusBox",
+    )
     Box(
         modifier
             .size(size)
@@ -163,7 +167,7 @@ fun FocusButton(
         Icon(
             icon,
             contentDescription = null,
-            tint = if (selected) ui.wp.dark else Color.White,
+            tint = if (selected) ui.wp.dark else inkFg(),
             modifier = Modifier.size(size * 0.46f),
         )
     }
@@ -202,7 +206,11 @@ fun Tile(
     val ui = LocalUi.current
     var focused by remember { mutableStateOf(false) }
     var longFired by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.14f else 1f, animationSpec = LiquidSpring, label = "tile")
+    val scale by animateFloatAsState(
+        if (focused) (if (ui.settings.glass == GlassStyle.Liquid) 1.08f else 1.14f) else 1f,
+        animationSpec = LiquidSpring,
+        label = "tile",
+    )
     val d = 76.dp
     Column(
         modifier
@@ -249,15 +257,18 @@ fun Tile(
             ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            Modifier.size(d).glass(ui.settings.shape.toShape(), focused),
+        GlassBox(
+            Modifier.size(d),
+            ui.settings.shape.toShape(),
+            focused,
+            strict = false,
             contentAlignment = Alignment.Center,
         ) { content(this, d) }
         if (ui.settings.showNames || forceName) {
             Spacer(Modifier.height(8.dp))
             Text(
                 label,
-                color = if (highlight) ui.wp.accent else Color.White.copy(alpha = if (focused) 1f else 0.88f),
+                color = if (highlight) inkAccent(ui.wp.accent) else inkFg(Color.White.copy(alpha = if (focused) 1f else 0.88f)),
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -291,7 +302,7 @@ fun BoxScope.AppGlyph(app: AppEntry, d: Dp) {
             contentDescription = null,
             modifier = Modifier.size(d * 0.58f),
             contentScale = ContentScale.Fit,
-            colorFilter = ColorFilter.tint(ui.wp.accent),
+            colorFilter = ColorFilter.tint(inkAccent(ui.wp.accent)),
             filterQuality = FilterQuality.High,
         )
         themed -> {
@@ -335,18 +346,27 @@ fun Rail(
     val btn = 54.dp
     val gap = 10.dp
     val padV = 12.dp
+    val liquid = ui.settings.glass == GlassStyle.Liquid
     // the highlight is one blob that slides (and slightly overshoots) to the current page
     val slide by animateFloatAsState(
         selected.toFloat(),
         animationSpec = spring(dampingRatio = 0.72f, stiffness = 240f),
         label = "railSlide",
     )
-    Box(modifier.width(71.dp).glass(RoundedCornerShape(36.dp))) {
+    GlassBox(modifier.width(71.dp), RoundedCornerShape(36.dp), strict = false) {
         Box(
             Modifier
                 .align(Alignment.TopCenter)
                 .offset { IntOffset(0, (padV.toPx() + slide * (btn + gap).toPx()).roundToInt()) }
                 .size(btn)
+                .graphicsLayer {
+                    // gel: while the blob travels it stretches along its path, then settles (and squashes on overshoot)
+                    if (liquid) {
+                        val far = kotlin.math.min(1f, kotlin.math.abs(slide - selected))
+                        scaleY = 1f + 0.38f * far
+                        scaleX = 1f - 0.14f * far
+                    }
+                }
                 .drawBehind {
                     val r = CornerRadius(22.dp.toPx())
                     drawRoundRect(ui.wp.accent, cornerRadius = r)
@@ -396,8 +416,9 @@ fun TopPill(
         }
     }
     val down = Modifier.dpad(down = nav.content)
+    GlassBox(modifier.height(46.dp), RoundedCornerShape(23.dp), contentAlignment = Alignment.CenterStart) {
     Row(
-        modifier.height(46.dp).glass(RoundedCornerShape(23.dp)).padding(horizontal = 8.dp),
+        Modifier.padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -405,10 +426,11 @@ fun TopPill(
         FocusButton(Icons.Rounded.Settings, 34.dp, CircleShape, modifier = down, onClick = onSystem)
         FocusButton(Icons.Rounded.Wifi, 34.dp, CircleShape, modifier = down, onClick = onWifi)
         FocusButton(Icons.Rounded.SettingsInputHdmi, 34.dp, CircleShape, modifier = down, onClick = onInputs)
-        Text(time, color = Color.White, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 6.dp))
+        Text(time, color = inkFg(), fontSize = 15.sp, modifier = Modifier.padding(horizontal = 6.dp))
         FocusBox(34.dp, CircleShape, down, onClick = onAccount) {
             Avatar(acct?.photo, acct?.emails?.firstOrNull()?.take(1)?.uppercase() ?: "", 28.dp)
         }
+    }
     }
 }
 
@@ -416,10 +438,12 @@ fun TopPill(
 
 @Composable
 fun PopupPanel(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.width(320.dp).glass(RoundedCornerShape(24.dp)).padding(16.dp)) {
-        Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium)
-        Spacer(Modifier.height(10.dp))
-        content()
+    GlassBox(Modifier.width(320.dp), RoundedCornerShape(24.dp)) {
+        Column(Modifier.padding(16.dp)) {
+            Text(title, color = inkFg(), fontSize = 17.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(10.dp))
+            content()
+        }
     }
 }
 
@@ -462,19 +486,19 @@ fun PopupRow(
             Icon(
                 icon,
                 contentDescription = null,
-                tint = if (highlighted) ui.wp.accent else Color.White,
+                tint = if (highlighted) inkAccent(ui.wp.accent) else inkFg(),
                 modifier = Modifier.size(22.dp),
             )
             Spacer(Modifier.width(12.dp))
         }
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, color = inkFg(), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subtitle != null) {
-                Text(subtitle, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, color = inkFg(Color.White.copy(alpha = 0.7f)), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         if (trailing != null) {
-            Icon(trailing, contentDescription = null, tint = ui.wp.accent, modifier = Modifier.size(20.dp))
+            Icon(trailing, contentDescription = null, tint = inkAccent(ui.wp.accent), modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -497,7 +521,7 @@ fun WifiPopup(state: WifiState?, locOk: Boolean, focus: FocusRequester, onGrant:
             state.ethernet -> "Connected through Ethernet"
             else -> "Not connected"
         }
-        Text(status, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+        Text(status, color = inkFg(Color.White.copy(alpha = 0.75f)), fontSize = 12.sp)
         Spacer(Modifier.height(8.dp))
         if (!locOk) {
             PopupRow(
@@ -524,7 +548,7 @@ fun WifiPopup(state: WifiState?, locOk: Boolean, focus: FocusRequester, onGrant:
                 }
             }
         } else if (state != null) {
-            Text("No networks found. Make sure location is turned on.", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+            Text("No networks found. Make sure location is turned on.", color = inkFg(Color.White.copy(alpha = 0.7f)), fontSize = 12.sp)
         }
         Spacer(Modifier.height(6.dp))
         PopupRow(
@@ -551,7 +575,7 @@ fun InputsPopup(items: List<InputItem>, focus: FocusRequester, onPick: (InputIte
         if (items.isEmpty()) {
             Text(
                 "No inputs found. Use the INPUT or SOURCE button on your remote.",
-                color = Color.White.copy(alpha = 0.7f),
+                color = inkFg(Color.White.copy(alpha = 0.7f)),
                 fontSize = 12.sp,
             )
             Spacer(Modifier.height(6.dp))
@@ -585,24 +609,24 @@ fun AccountPopup(acct: AcctState?, accOk: Boolean, focus: FocusRequester, onGran
                 Avatar(acct?.photo, emails[0].take(1).uppercase(), 56.dp)
                 Spacer(Modifier.width(14.dp))
                 Column {
-                    Text(acct?.name ?: "Google account", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(emails[0], color = Color.White.copy(alpha = 0.78f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(acct?.name ?: "Google account", color = inkFg(), fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(emails[0], color = inkFg(Color.White.copy(alpha = 0.78f)), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             if (emails.size > 1) {
                 Spacer(Modifier.height(10.dp))
                 for (e in emails.drop(1)) {
-                    Text(e, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(e, color = inkFg(Color.White.copy(alpha = 0.7f)), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Spacer(Modifier.height(12.dp))
             PopupRow("Manage accounts", icon = Icons.Rounded.Settings, modifier = Modifier.focusRequester(focus), onClick = onManage)
         } else if (!accOk) {
-            Text("Allow account access to show who is signed in.", color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+            Text("Allow account access to show who is signed in.", color = inkFg(Color.White.copy(alpha = 0.75f)), fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
             PopupRow("Allow access", icon = Icons.Rounded.Person, modifier = Modifier.focusRequester(focus), onClick = onGrant)
         } else {
-            Text("No Google account found on this TV.", color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+            Text("No Google account found on this TV.", color = inkFg(Color.White.copy(alpha = 0.75f)), fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
             PopupRow("Account settings", icon = Icons.Rounded.Settings, modifier = Modifier.focusRequester(focus), onClick = onManage)
         }

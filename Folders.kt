@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,7 +73,11 @@ fun saveFolderMap(p: SharedPreferences, m: Map<String, String>) {
 private fun FolderCard(name: String, apps: List<AppEntry>, modifier: Modifier, onClick: () -> Unit) {
     val ui = LocalUi.current
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.1f else 1f, animationSpec = LiquidSpring, label = "folder")
+    val scale by animateFloatAsState(
+        if (focused) (if (ui.settings.glass == GlassStyle.Liquid) 1.08f else 1.1f) else 1f,
+        animationSpec = LiquidSpring,
+        label = "folder",
+    )
     val box = 108.dp
     Column(
         modifier
@@ -86,8 +91,11 @@ private fun FolderCard(name: String, apps: List<AppEntry>, modifier: Modifier, o
             ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            Modifier.size(box).glass(RoundedCornerShape(30.dp), focused),
+        GlassBox(
+            Modifier.size(box),
+            RoundedCornerShape(30.dp),
+            focused,
+            strict = false,
             contentAlignment = Alignment.Center,
         ) {
             val shown = apps.take(4)
@@ -224,6 +232,8 @@ fun MoveAppDialog(
         contentAlignment = Alignment.Center,
     ) {
         Box(Modifier.pointerInput(Unit) { detectTapGestures { } }) {
+          // the dialog's dim sits between the wallpaper and the glass, so the glass has to know about it
+          CompositionLocalProvider(LocalGlassDim provides 0.55f) {
             PopupPanel("Move ${app.label} to") {
                 Column(
                     Modifier.heightIn(max = 340.dp).verticalScroll(rememberScrollState()),
@@ -247,6 +257,7 @@ fun MoveAppDialog(
                     }
                 }
             }
+          }
         }
     }
 }

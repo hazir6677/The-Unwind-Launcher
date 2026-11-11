@@ -1,0 +1,1847 @@
+diff --git a/Components.kt b/Components.kt
+index 49f62f9..af6ac06 100644
+--- a/Components.kt
++++ b/Components.kt
+@@ -129,7 +129,11 @@ fun FocusBox(
+ ) {
+     val ui = LocalUi.current
+     var focused by remember { mutableStateOf(false) }
+-    val scale by animateFloatAsState(if (focused) 1.1f else 1f, animationSpec = LiquidSpring, label = "focusBox")
++    val scale by animateFloatAsState(
++        if (focused) (if (ui.settings.glass == GlassStyle.Liquid) 1.06f else 1.1f) else 1f,
++        animationSpec = LiquidSpring,
++        label = "focusBox",
++    )
+     Box(
+         modifier
+             .size(size)
+@@ -163,7 +167,7 @@ fun FocusButton(
+         Icon(
+             icon,
+             contentDescription = null,
+-            tint = if (selected) ui.wp.dark else Color.White,
++            tint = if (selected) ui.wp.dark else inkFg(),
+             modifier = Modifier.size(size * 0.46f),
+         )
+     }
+@@ -202,7 +206,11 @@ fun Tile(
+     val ui = LocalUi.current
+     var focused by remember { mutableStateOf(false) }
+     var longFired by remember { mutableStateOf(false) }
+-    val scale by animateFloatAsState(if (focused) 1.14f else 1f, animationSpec = LiquidSpring, label = "tile")
++    val scale by animateFloatAsState(
++        if (focused) (if (ui.settings.glass == GlassStyle.Liquid) 1.08f else 1.14f) else 1f,
++        animationSpec = LiquidSpring,
++        label = "tile",
++    )
+     val d = 76.dp
+     Column(
+         modifier
+@@ -249,15 +257,18 @@ fun Tile(
+             ),
+         horizontalAlignment = Alignment.CenterHorizontally,
+     ) {
+-        Box(
+-            Modifier.size(d).glass(ui.settings.shape.toShape(), focused),
++        GlassBox(
++            Modifier.size(d),
++            ui.settings.shape.toShape(),
++            focused,
++            strict = false,
+             contentAlignment = Alignment.Center,
+         ) { content(this, d) }
+         if (ui.settings.showNames || forceName) {
+             Spacer(Modifier.height(8.dp))
+             Text(
+                 label,
+-                color = if (highlight) ui.wp.accent else Color.White.copy(alpha = if (focused) 1f else 0.88f),
++                color = if (highlight) inkAccent(ui.wp.accent) else inkFg(Color.White.copy(alpha = if (focused) 1f else 0.88f)),
+                 fontSize = 12.sp,
+                 maxLines = 1,
+                 overflow = TextOverflow.Ellipsis,
+@@ -291,7 +302,7 @@ fun BoxScope.AppGlyph(app: AppEntry, d: Dp) {
+             contentDescription = null,
+             modifier = Modifier.size(d * 0.58f),
+             contentScale = ContentScale.Fit,
+-            colorFilter = ColorFilter.tint(ui.wp.accent),
++            colorFilter = ColorFilter.tint(inkAccent(ui.wp.accent)),
+             filterQuality = FilterQuality.High,
+         )
+         themed -> {
+@@ -335,18 +346,27 @@ fun Rail(
+     val btn = 54.dp
+     val gap = 10.dp
+     val padV = 12.dp
++    val liquid = ui.settings.glass == GlassStyle.Liquid
+     // the highlight is one blob that slides (and slightly overshoots) to the current page
+     val slide by animateFloatAsState(
+         selected.toFloat(),
+         animationSpec = spring(dampingRatio = 0.72f, stiffness = 240f),
+         label = "railSlide",
+     )
+-    Box(modifier.width(71.dp).glass(RoundedCornerShape(36.dp))) {
++    GlassBox(modifier.width(71.dp), RoundedCornerShape(36.dp), strict = false) {
+         Box(
+             Modifier
+                 .align(Alignment.TopCenter)
+                 .offset { IntOffset(0, (padV.toPx() + slide * (btn + gap).toPx()).roundToInt()) }
+                 .size(btn)
++                .graphicsLayer {
++                    // gel: while the blob travels it stretches along its path, then settles (and squashes on overshoot)
++                    if (liquid) {
++                        val far = kotlin.math.min(1f, kotlin.math.abs(slide - selected))
++                        scaleY = 1f + 0.38f * far
++                        scaleX = 1f - 0.14f * far
++                    }
++                }
+                 .drawBehind {
+                     val r = CornerRadius(22.dp.toPx())
+                     drawRoundRect(ui.wp.accent, cornerRadius = r)
+@@ -396,8 +416,9 @@ fun TopPill(
+         }
+     }
+     val down = Modifier.dpad(down = nav.content)
++    GlassBox(modifier.height(46.dp), RoundedCornerShape(23.dp), contentAlignment = Alignment.CenterStart) {
+     Row(
+-        modifier.height(46.dp).glass(RoundedCornerShape(23.dp)).padding(horizontal = 8.dp),
++        Modifier.padding(horizontal = 8.dp),
+         verticalAlignment = Alignment.CenterVertically,
+         horizontalArrangement = Arrangement.spacedBy(4.dp),
+     ) {
+@@ -405,21 +426,24 @@ fun TopPill(
+         FocusButton(Icons.Rounded.Settings, 34.dp, CircleShape, modifier = down, onClick = onSystem)
+         FocusButton(Icons.Rounded.Wifi, 34.dp, CircleShape, modifier = down, onClick = onWifi)
+         FocusButton(Icons.Rounded.SettingsInputHdmi, 34.dp, CircleShape, modifier = down, onClick = onInputs)
+-        Text(time, color = Color.White, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 6.dp))
++        Text(time, color = inkFg(), fontSize = 15.sp, modifier = Modifier.padding(horizontal = 6.dp))
+         FocusBox(34.dp, CircleShape, down, onClick = onAccount) {
+             Avatar(acct?.photo, acct?.emails?.firstOrNull()?.take(1)?.uppercase() ?: "", 28.dp)
+         }
+     }
++    }
+ }
+ 
+ // ---------- Popups ----------
+ 
+ @Composable
+ fun PopupPanel(title: String, content: @Composable ColumnScope.() -> Unit) {
+-    Column(Modifier.width(320.dp).glass(RoundedCornerShape(24.dp)).padding(16.dp)) {
+-        Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium)
+-        Spacer(Modifier.height(10.dp))
+-        content()
++    GlassBox(Modifier.width(320.dp), RoundedCornerShape(24.dp)) {
++        Column(Modifier.padding(16.dp)) {
++            Text(title, color = inkFg(), fontSize = 17.sp, fontWeight = FontWeight.Medium)
++            Spacer(Modifier.height(10.dp))
++            content()
++        }
+     }
+ }
+ 
+@@ -462,19 +486,19 @@ fun PopupRow(
+             Icon(
+                 icon,
+                 contentDescription = null,
+-                tint = if (highlighted) ui.wp.accent else Color.White,
++                tint = if (highlighted) inkAccent(ui.wp.accent) else inkFg(),
+                 modifier = Modifier.size(22.dp),
+             )
+             Spacer(Modifier.width(12.dp))
+         }
+         Column(Modifier.weight(1f)) {
+-            Text(title, color = Color.White, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            Text(title, color = inkFg(), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+             if (subtitle != null) {
+-                Text(subtitle, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                Text(subtitle, color = inkFg(Color.White.copy(alpha = 0.7f)), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+             }
+         }
+         if (trailing != null) {
+-            Icon(trailing, contentDescription = null, tint = ui.wp.accent, modifier = Modifier.size(20.dp))
++            Icon(trailing, contentDescription = null, tint = inkAccent(ui.wp.accent), modifier = Modifier.size(20.dp))
+         }
+     }
+ }
+@@ -497,7 +521,7 @@ fun WifiPopup(state: WifiState?, locOk: Boolean, focus: FocusRequester, onGrant:
+             state.ethernet -> "Connected through Ethernet"
+             else -> "Not connected"
+         }
+-        Text(status, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
++        Text(status, color = inkFg(Color.White.copy(alpha = 0.75f)), fontSize = 12.sp)
+         Spacer(Modifier.height(8.dp))
+         if (!locOk) {
+             PopupRow(
+@@ -524,7 +548,7 @@ fun WifiPopup(state: WifiState?, locOk: Boolean, focus: FocusRequester, onGrant:
+                 }
+             }
+         } else if (state != null) {
+-            Text("No networks found. Make sure location is turned on.", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
++            Text("No networks found. Make sure location is turned on.", color = inkFg(Color.White.copy(alpha = 0.7f)), fontSize = 12.sp)
+         }
+         Spacer(Modifier.height(6.dp))
+         PopupRow(
+@@ -551,7 +575,7 @@ fun InputsPopup(items: List<InputItem>, focus: FocusRequester, onPick: (InputIte
+         if (items.isEmpty()) {
+             Text(
+                 "No inputs found. Use the INPUT or SOURCE button on your remote.",
+-                color = Color.White.copy(alpha = 0.7f),
++                color = inkFg(Color.White.copy(alpha = 0.7f)),
+                 fontSize = 12.sp,
+             )
+             Spacer(Modifier.height(6.dp))
+@@ -585,24 +609,24 @@ fun AccountPopup(acct: AcctState?, accOk: Boolean, focus: FocusRequester, onGran
+                 Avatar(acct?.photo, emails[0].take(1).uppercase(), 56.dp)
+                 Spacer(Modifier.width(14.dp))
+                 Column {
+-                    Text(acct?.name ?: "Google account", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+-                    Text(emails[0], color = Color.White.copy(alpha = 0.78f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                    Text(acct?.name ?: "Google account", color = inkFg(), fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                    Text(emails[0], color = inkFg(Color.White.copy(alpha = 0.78f)), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 }
+             }
+             if (emails.size > 1) {
+                 Spacer(Modifier.height(10.dp))
+                 for (e in emails.drop(1)) {
+-                    Text(e, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                    Text(e, color = inkFg(Color.White.copy(alpha = 0.7f)), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 }
+             }
+             Spacer(Modifier.height(12.dp))
+             PopupRow("Manage accounts", icon = Icons.Rounded.Settings, modifier = Modifier.focusRequester(focus), onClick = onManage)
+         } else if (!accOk) {
+-            Text("Allow account access to show who is signed in.", color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
++            Text("Allow account access to show who is signed in.", color = inkFg(Color.White.copy(alpha = 0.75f)), fontSize = 12.sp)
+             Spacer(Modifier.height(8.dp))
+             PopupRow("Allow access", icon = Icons.Rounded.Person, modifier = Modifier.focusRequester(focus), onClick = onGrant)
+         } else {
+-            Text("No Google account found on this TV.", color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
++            Text("No Google account found on this TV.", color = inkFg(Color.White.copy(alpha = 0.75f)), fontSize = 12.sp)
+             Spacer(Modifier.height(8.dp))
+             PopupRow("Account settings", icon = Icons.Rounded.Settings, modifier = Modifier.focusRequester(focus), onClick = onManage)
+         }
+diff --git a/Folders.kt b/Folders.kt
+index c3bda58..11f505d 100644
+--- a/Folders.kt
++++ b/Folders.kt
+@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.Check
+ import androidx.compose.material.icons.rounded.Refresh
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
+ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableStateOf
+@@ -72,7 +73,11 @@ fun saveFolderMap(p: SharedPreferences, m: Map<String, String>) {
+ private fun FolderCard(name: String, apps: List<AppEntry>, modifier: Modifier, onClick: () -> Unit) {
+     val ui = LocalUi.current
+     var focused by remember { mutableStateOf(false) }
+-    val scale by animateFloatAsState(if (focused) 1.1f else 1f, animationSpec = LiquidSpring, label = "folder")
++    val scale by animateFloatAsState(
++        if (focused) (if (ui.settings.glass == GlassStyle.Liquid) 1.08f else 1.1f) else 1f,
++        animationSpec = LiquidSpring,
++        label = "folder",
++    )
+     val box = 108.dp
+     Column(
+         modifier
+@@ -86,8 +91,11 @@ private fun FolderCard(name: String, apps: List<AppEntry>, modifier: Modifier, o
+             ),
+         horizontalAlignment = Alignment.CenterHorizontally,
+     ) {
+-        Box(
+-            Modifier.size(box).glass(RoundedCornerShape(30.dp), focused),
++        GlassBox(
++            Modifier.size(box),
++            RoundedCornerShape(30.dp),
++            focused,
++            strict = false,
+             contentAlignment = Alignment.Center,
+         ) {
+             val shown = apps.take(4)
+@@ -224,6 +232,8 @@ fun MoveAppDialog(
+         contentAlignment = Alignment.Center,
+     ) {
+         Box(Modifier.pointerInput(Unit) { detectTapGestures { } }) {
++          // the dialog's dim sits between the wallpaper and the glass, so the glass has to know about it
++          CompositionLocalProvider(LocalGlassDim provides 0.55f) {
+             PopupPanel("Move ${app.label} to") {
+                 Column(
+                     Modifier.heightIn(max = 340.dp).verticalScroll(rememberScrollState()),
+@@ -247,6 +257,7 @@ fun MoveAppDialog(
+                     }
+                 }
+             }
++          }
+         }
+     }
+ }
+diff --git a/Glass.kt b/Glass.kt
+index 9794f16..276713d 100644
+--- a/Glass.kt
++++ b/Glass.kt
+@@ -59,7 +59,7 @@ fun scaleDown(src: Bitmap, w: Int, h: Int): Bitmap {
+ }
+ 
+ /** Pre-blurred copies of the wallpaper, already cropped to the screen's shape so glass lines up with it. */
+-class Backdrops(val soft: Bitmap, val heavy: Bitmap, val clear: Bitmap)
++class Backdrops(val soft: Bitmap, val heavy: Bitmap, val liquid: LiquidData?)
+ 
+ private fun blurPass(src: IntArray, dst: IntArray, w: Int, h: Int, r: Int, horizontal: Boolean) {
+     val lines = if (horizontal) h else w
+@@ -96,7 +96,11 @@ private fun cropToAspect(src: Bitmap, aspect: Float): Bitmap {
+     }
+ }
+ 
+-fun makeBackdrops(src: Bitmap, aspect: Float): Backdrops {
++/**
++ * [scrimA] and [screenWidthPx] let the Liquid backdrop match what is really behind the glass: the wallpaper with the
++ * launcher's own scrims on top, softened by a small blur (see LG.BLUR_PX).
++ */
++fun makeBackdrops(src: Bitmap, aspect: Float, scrimA: Float, screenWidthPx: Int): Backdrops {
+     val cropped = cropToAspect(src, aspect)
+     fun blurred(w: Int, r: Int, passes: Int): Bitmap {
+         val h = max(14, (w / aspect).roundToInt())
+@@ -112,16 +116,23 @@ fun makeBackdrops(src: Bitmap, aspect: Float): Backdrops {
+         out.setPixels(a, 0, w, 0, 0, w, h)
+         return out
+     }
++    // Liquid: about 960 wide (half of a 1080p screen) so the rim stays sharp, then scrims and a light blur
++    val lw = 960
++    val lh = max(14, (lw / aspect).roundToInt())
++    val lsmall = scaleDown(cropped, lw, lh)
++    val lpx = IntArray(lw * lh)
++    lsmall.getPixels(lpx, 0, lw, 0, 0, lw, lh)
++    for (i in lpx.indices) lpx[i] = lpx[i] or (0xFF shl 24)
+     return Backdrops(
+         soft = blurred(160, 2, 2),
+         heavy = blurred(56, 2, 3),
+-        clear = blurred(640, 2, 1), // sharper, so refraction is visible
++        liquid = buildLiquidData(lpx, lw, lh, scrimA, screenWidthPx),
+     )
+ }
+ 
+ // ---------- Path helpers ----------
+ 
+-private fun Outline.asPath(): Path {
++internal fun Outline.asPath(): Path {
+     val o = this
+     return Path().apply {
+         when (o) {
+@@ -132,7 +143,7 @@ private fun Outline.asPath(): Path {
+     }
+ }
+ 
+-private fun insetPath(shape: Shape, size: Size, inset: Float, dir: LayoutDirection, d: Density): Path {
++internal fun insetPath(shape: Shape, size: Size, inset: Float, dir: LayoutDirection, d: Density): Path {
+     val s = Size((size.width - 2f * inset).coerceAtLeast(2f), (size.height - 2f * inset).coerceAtLeast(2f))
+     val p = shape.createOutline(s, dir, d).asPath()
+     p.translate(Offset(inset, inset))
+@@ -156,21 +167,13 @@ private fun backdropBrush(
+     return ShaderBrush(shader)
+ }
+ 
+-// How strongly each lens band zooms, outer rim first. Below 1 pulls in outside content.
+-private val LENS_Z = floatArrayOf(0.84f, 0.89f, 0.94f, 0.99f, 1.03f, 1.06f)
+-
+-private val SATURATE: ColorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.35f) })
+-
+ // ---------- The glass itself ----------
+ 
+ /**
+  * Draws a glass surface in one of three styles.
+  *
+- * Liquid: a lens. The middle is slightly magnified, the rim is drawn in six thin bands that pull in
+- * the wallpaper from outside the shape (refraction), then specular edge light and a rainbow fringe.
+- * On focus the lens swells and overshoots, like a drop of water.
+- *
+- * Normal / Frost: the wallpaper blurred behind a tint.
++ * Liquid: real refraction, baked per element (see LiquidCore.kt / LiquidGlass.kt).
++ * Normal / Frost: the wallpaper blurred behind a tint (unchanged).
+  *
+  * Everything is drawn as anti-aliased paths, so edges stay smooth even while scaling.
+  * [idle] = false means: only draw while focused (used for small buttons).
+@@ -182,6 +185,27 @@ fun Modifier.glass(
+     style: GlassStyle? = null,
+     blur: Boolean = true,
+     idle: Boolean = true,
++    node: GlassNode? = null,
++    strict: Boolean = true,
++    overlayOnly: Boolean = false,
++): Modifier {
++    val ui = LocalUi.current
++    val st = style ?: ui.settings.glass
++    // Liquid has its own renderer (LiquidGlass.kt); Normal and Frost are untouched below.
++    return if (st == GlassStyle.Liquid && ui.backdrops?.liquid != null) {
++        liquidGlass(shape, focused, idle, node ?: remember { GlassNode() }, strict, overlayOnly)
++    } else {
++        classicGlass(shape, focused, style, blur, idle)
++    }
++}
++
++@Composable
++private fun Modifier.classicGlass(
++    shape: Shape,
++    focused: Boolean,
++    style: GlassStyle?,
++    blur: Boolean,
++    idle: Boolean,
+ ): Modifier {
+     val ui = LocalUi.current
+     val st = style ?: ui.settings.glass
+@@ -201,9 +225,6 @@ fun Modifier.glass(
+             val h = size.height
+             val dir = layoutDirection
+             val path = shape.createOutline(size, dir, this).asPath()
+-            // Liquid glass is drawn as six thin lens bands, outermost first, each a bit less "pulled in".
+-            val bw = min(min(w, h) * 0.045f, 4.dp.toPx())
+-            val bandPaths = if (st == GlassStyle.Liquid) Array(5) { insetPath(shape, size, bw * (it + 1), dir, this) } else emptyArray<Path>()
+             val ring = insetPath(shape, size, 1.25.dp.toPx(), dir, this)
+             val hair = 1.dp.toPx()
+             val focusW = 2.5.dp.toPx()
+@@ -216,7 +237,7 @@ fun Modifier.glass(
+                 val cx = ox + w / 2f
+                 val cy = oy + h / 2f
+                 val bmp = when (st) {
+-                    GlassStyle.Liquid -> backdrops?.clear
++                    GlassStyle.Liquid -> null
+                     GlassStyle.Normal -> backdrops?.soft
+                     GlassStyle.Frost -> backdrops?.heavy
+                 }
+@@ -226,36 +247,8 @@ fun Modifier.glass(
+ 
+                 when (st) {
+                     GlassStyle.Liquid -> {
+-                        if (bm != null) {
+-                            // outer bands pull in wallpaper from outside the shape (refraction),
+-                            // inner bands settle to a slight magnification in the middle
+-                            for (i in LENS_Z.indices) {
+-                                val base = LENS_Z[i]
+-                                val z = if (base < 1f) base - 0.04f * p else base + 0.06f * p
+-                                val shape2 = if (i == 0) path else bandPaths[i - 1]
+-                                drawPath(shape2, backdropBrush(bm, sx, sy, z, cx, cy, ox, oy), colorFilter = SATURATE)
+-                            }
+-                        } else {
+-                            drawPath(path, Color.White.copy(alpha = 0.14f))
+-                        }
+-                        drawPath(path, Color.White.copy(alpha = 0.05f + 0.06f * min(p, 1f)))
+-                        drawPath(path, tint.copy(alpha = 0.12f))
+-                        drawPath(
+-                            path,
+-                            Brush.radialGradient(
+-                                listOf(Color.White.copy(alpha = 0.34f), Color.Transparent),
+-                                center = Offset(w * 0.25f, 0f),
+-                                radius = max(w, h) * 0.85f,
+-                            ),
+-                        )
+-                        drawPath(
+-                            path,
+-                            Brush.verticalGradient(
+-                                0.7f to Color.Transparent,
+-                                1f to Color.White.copy(alpha = 0.14f),
+-                            ),
+-                        )
+-                        // No outline strokes here: the edge is defined by the lens bands alone.
++                        // Only seen for a moment before the wallpaper data is ready; liquidGlass() does the real work.
++                        drawPath(path, Color.White.copy(alpha = 0.10f + 0.06f * min(p, 1f)))
+                     }
+                     GlassStyle.Normal -> {
+                         if (bm != null) drawPath(path, backdropBrush(bm, sx, sy, 1f, cx, cy, ox, oy))
+diff --git a/Greeting.kt b/Greeting.kt
+index 6cad0af..6f4545f 100644
+--- a/Greeting.kt
++++ b/Greeting.kt
+@@ -46,13 +46,13 @@ fun GreetingText(g: Greeting, scale: Float = 1f) {
+     val shadow = TextStyle(shadow = Shadow(Color(0x66000000), blurRadius = 14f))
+     Column {
+         if (g.top.isNotBlank()) {
+-            Text(g.top, color = Color.White.copy(alpha = 0.92f), fontSize = (15f * scale).sp, style = shadow)
++            Text(g.top, color = inkFg(Color.White.copy(alpha = 0.92f)), fontSize = (15f * scale).sp, style = shadow)
+             Spacer(Modifier.height((6f * scale).dp))
+         }
+         if (g.line1.isNotBlank()) {
+             Text(
+                 g.line1,
+-                color = Color.White,
++                color = inkFg(),
+                 fontSize = (54f * scale).sp,
+                 lineHeight = (56f * scale).sp,
+                 fontWeight = FontWeight.Medium,
+@@ -64,7 +64,7 @@ fun GreetingText(g: Greeting, scale: Float = 1f) {
+         if (g.line2.isNotBlank()) {
+             Text(
+                 g.line2,
+-                color = ui.wp.accent,
++                color = inkAccent(ui.wp.accent),
+                 fontSize = (54f * scale).sp,
+                 lineHeight = (56f * scale).sp,
+                 fontWeight = FontWeight.Medium,
+@@ -87,20 +87,21 @@ private fun FieldCard(
+ ) {
+     val ui = LocalUi.current
+     OptionCard(selected = selected, w = 300.dp, h = 56.dp, modifier = modifier, onClick = onClick) {
+-        Box(
+-            Modifier.fillMaxSize().glass(RoundedCornerShape(16.dp)),
++        GlassBox(
++            Modifier.fillMaxSize(),
++            RoundedCornerShape(16.dp),
+             contentAlignment = Alignment.CenterStart,
+         ) {
+             Column(Modifier.padding(horizontal = 14.dp)) {
+                 Text(
+                     label,
+-                    color = if (selected) ui.wp.accent else Color.White.copy(alpha = 0.7f),
++                    color = if (selected) inkAccent(ui.wp.accent) else inkFg(Color.White.copy(alpha = 0.7f)),
+                     fontSize = 10.sp,
+                     fontWeight = FontWeight.Medium,
+                 )
+                 Text(
+                     if (value.isEmpty()) hint else if (selected) "$value|" else value,
+-                    color = Color.White.copy(alpha = if (value.isEmpty()) 0.5f else 1f),
++                    color = inkFg(Color.White.copy(alpha = if (value.isEmpty()) 0.5f else 1f)),
+                     fontSize = 16.sp,
+                     maxLines = 1,
+                     overflow = TextOverflow.Ellipsis,
+@@ -199,10 +200,13 @@ fun GreetingEditor(
+             }
+             // Right: live preview and keyboard
+             Column {
+-                Box(
+-                    Modifier.width(446.dp).height(104.dp).glass(RoundedCornerShape(22.dp)).padding(horizontal = 18.dp, vertical = 12.dp),
++                GlassBox(
++                    Modifier.width(446.dp).height(104.dp),
++                    RoundedCornerShape(22.dp),
+                     contentAlignment = Alignment.CenterStart,
+-                ) { GreetingText(Greeting(small, big1, big2), 0.45f) }
++                ) {
++                    Box(Modifier.padding(horizontal = 18.dp, vertical = 12.dp)) { GreetingText(Greeting(small, big1, big2), 0.45f) }
++                }
+                 Spacer(Modifier.height(12.dp))
+                 val rows = listOf("abcdefghijk", "lmnopqrstuv", "wxyz'.,!?-&", "1234567890:")
+                 rows.forEachIndexed { ri, row ->
+diff --git a/Intro.kt b/Intro.kt
+index 60aa5d2..0f6a59a 100644
+--- a/Intro.kt
++++ b/Intro.kt
+@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.Favorite
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
+ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableStateOf
+@@ -147,6 +148,8 @@ fun IntroScreen(onDone: () -> Unit) {
+     }
+     BackHandler(enabled = true) { onDone() }
+ 
++    // the dark overlay (about 64% on average) sits behind the card, so the glass has to know about it
++    CompositionLocalProvider(LocalGlassDim provides 0.64f) {
+     Box(
+         Modifier
+             .fillMaxSize()
+@@ -228,4 +231,5 @@ fun IntroScreen(onDone: () -> Unit) {
+             }
+         }
+     }
++    }
+ }
+diff --git a/LiquidCore.kt b/LiquidCore.kt
+new file mode 100644
+index 0000000..3c0cc6b
+--- /dev/null
++++ b/LiquidCore.kt
+@@ -0,0 +1,733 @@
++package com.unwind.launcher
++
++import kotlin.math.abs
++import kotlin.math.asin
++import kotlin.math.atan
++import kotlin.math.exp
++import kotlin.math.max
++import kotlin.math.min
++import kotlin.math.pow
++import kotlin.math.sqrt
++import kotlin.math.tan
++
++/*
++ * Liquid Glass core. Plain Kotlin on purpose (no Android classes) so the math can be run and
++ * tested on a normal JVM. LiquidGlass.kt wraps this for Compose.
++ *
++ * Everything you are likely to tune is in [LG] below.
++ */
++
++/** Tunable constants. Distances are in px at the screen's native size unless noted. */
++object LG {
++    // ---- Refraction ----
++    /** Refractive index of the glass. Apple's look sits around 1.5. */
++    const val REFRACTIVE_INDEX = 1.5f
++    /** Width of the curved rim as a fraction of the element's shortest side (spec: 10-20%). */
++    const val BEZEL_FRACTION = 0.16f
++    const val BEZEL_MIN_PX = 5f
++    const val BEZEL_MAX_PX = 44f
++    /** Slab thickness under the curved rim, as a multiple of the bezel width. Higher = stronger bend. */
++    const val THICKNESS = 1.15f
++    /** Overall multiplier on the displacement. 1 = physical. */
++    const val REFRACTION_STRENGTH = 1.0f
++    /** +1: rim shows content from further inside (physical for a convex dome). -1: pulls in outside content. */
++    const val REFRACT_DIRECTION = 1f
++    /** How much the flat middle magnifies (0.02 = 2%). Spec: "maybe very slightly". */
++    const val CENTER_MAGNIFY = 0.025f
++
++    // ---- Blur ----
++    /** Blur baked into the backdrop, in screen px (spec: 2-8). Used by makeLiquidBackdrop. */
++    const val BLUR_PX = 4
++
++    // ---- Dispersion ----
++    /** Extra red/blue shift at the rim in px. R and B end up about 2x this apart (spec: 1-3px total). */
++    const val DISPERSION_PX = 1.0f
++
++    // ---- Specular ----
++    const val RIM_WIDTH_PX = 1.4f
++    /** Peak rim brightness (0..1) before the dark/light-background adaptation. */
++    const val RIM_INTENSITY = 0.85f
++    const val GLOW_INTENSITY = 0.20f
++    const val INNER_SHADOW_INTENSITY = 0.16f
++    /** Light comes from the top-left. */
++    const val LIGHT_X = -0.7071f
++    const val LIGHT_Y = -0.7071f
++
++    // ---- Color ----
++    const val SATURATION = 1.45f      // spec: 120-180%
++    const val BRIGHTNESS_LIFT = 0.04f
++    const val TINT_WHITE = 0.08f      // spec: 5-12%
++    /** Faint dark tint that fades in over bright backgrounds so the glass stays legible. */
++    const val TINT_DARK_MAX = 0.10f
++
++    // ---- Shadows ----
++    const val SHADOW_OFFSET_Y = 8f
++    const val SHADOW_BLUR = 32f
++    const val SHADOW_ALPHA = 0.22f
++    const val CONTACT_BLUR = 4f
++    const val CONTACT_OFFSET_Y = 1.5f
++    const val CONTACT_ALPHA = 0.20f
++
++    // ---- Legibility ----
++    const val TEXT_CONTRAST = 4.5f
++    const val ICON_CONTRAST = 3.0f
++    /** The solver aims this far above the minimum, to absorb the rim highlight and refraction it cannot predict. */
++    const val SOLVER_MARGIN = 0.8f
++    /** The other color must be at least this much better (ratio) before the foreground flips. */
++    const val HYSTERESIS = 1.12f
++    /** Spread (p90-p10 of luminance) above which the backdrop is calmed, and how fast that ramps up. */
++    const val CALM_START = 0.10f
++    const val CALM_RANGE = 0.40f
++    const val CALM_MAX = 0.92f
++    /** How much the bright (for white text) or dark (for dark text) patches count versus the average. 1 = worst case only. */
++    const val WORST_WEIGHT = 0.9f
++    const val MAX_SCRIM = 0.30f       // spec asks for 10-25% typically; hard ceiling here
++    const val COLOR_FADE_MS = 260
++    /** Wallpaper map resolution (width in px). Spec: about 64. */
++    const val SAMPLE_W = 64
++    val FG_LIGHT = 0xFFFFFFFF.toInt()
++    val FG_DARK = 0xFF141416.toInt()
++
++    // ---- Motion ----
++    const val PRESS_SCALE = 1.06f
++}
++
++// ============================================================================================
++// Color math
++// ============================================================================================
++
++private fun srgbToLinear(c8: Int): Float {
++    val c = c8 / 255f
++    return if (c <= 0.04045f) c / 12.92f else ((c + 0.055f) / 1.055f).pow(2.4f)
++}
++
++private val LIN = FloatArray(256) { srgbToLinear(it) }
++
++/** WCAG relative luminance of an ARGB color (alpha ignored). */
++fun relLuminance(argb: Int): Float =
++    0.2126f * LIN[(argb shr 16) and 255] + 0.7152f * LIN[(argb shr 8) and 255] + 0.0722f * LIN[argb and 255]
++
++fun contrastRatio(l1: Float, l2: Float): Float {
++    val hi = max(l1, l2)
++    val lo = min(l1, l2)
++    return (hi + 0.05f) / (lo + 0.05f)
++}
++
++/** Dark adaptation for a pixel whose gamma-space luma is [lg]. Shared by the baker and the legibility sampler. */
++fun darkTintFor(lg: Float): Float = LG.TINT_DARK_MAX * smooth(0.35f, 0.9f, lg * lg)
++
++private fun clamp01(v: Float) = if (v < 0f) 0f else if (v > 1f) 1f else v
++private fun smooth(e0: Float, e1: Float, x: Float): Float {
++    val t = clamp01((x - e0) / (e1 - e0))
++    return t * t * (3f - 2f * t)
++}
++
++// ============================================================================================
++// Shape: signed distance of a rounded rectangle
++// ============================================================================================
++
++/** Rounded-rect shape inside a [w]x[h] box, with corner radius [r] (px). Capsule: r = min(w,h)/2. */
++class LgShape(val w: Float, val h: Float, r: Float) {
++    val r: Float = r.coerceIn(0f, min(w, h) / 2f)
++    private val hw = w / 2f
++    private val hh = h / 2f
++
++    /** Distance outside the edge (negative inside). Writes the outward normal into [out] (2 floats). */
++    fun sdf(x: Float, y: Float, out: FloatArray?): Float {
++        val px = x - hw
++        val py = y - hh
++        val qx = abs(px) - (hw - r)
++        val qy = abs(py) - (hh - r)
++        val ox = max(qx, 0f)
++        val oy = max(qy, 0f)
++        val len = sqrt(ox * ox + oy * oy)
++        val d = len + min(max(qx, qy), 0f) - r
++        if (out != null) {
++            var nx: Float
++            var ny: Float
++            if (len > 1e-4f) {
++                nx = ox / len; ny = oy / len
++            } else if (qx > qy) {
++                nx = 1f; ny = 0f
++            } else {
++                nx = 0f; ny = 1f
++            }
++            if (px < 0f) nx = -nx
++            if (py < 0f) ny = -ny
++            out[0] = nx
++            out[1] = ny
++        }
++        return d
++    }
++}
++
++// ============================================================================================
++// Optics: convex squircle bezel + Snell's law
++// ============================================================================================
++
++/**
++ * Precomputed rim profile. Index i covers depth s = i/(N-1) across the bezel (0 = the very edge, 1 = where the
++ * glass goes flat). Each entry is how far (in bezel-widths) the sampled background is shifted, along the
++ * inward normal.
++ *
++ * Surface: convex squircle  h(s) = (1 - (1-s)^4)^(1/4)  (vertical wall at the edge, flat at s = 1).
++ * A ray comes straight down, meets the surface tilted by theta_i = atan(slope), bends to theta_t by
++ * Snell (sin theta_i = n sin theta_t) and then travels the glass thickness beneath that point.
++ * Lateral shift = depth * tan(theta_i - theta_t).
++ */
++class BezelProfile(val n: Float = LG.REFRACTIVE_INDEX, val thickness: Float = LG.THICKNESS) {
++    companion object { const val N = 256 }
++
++    val shift = FloatArray(N)
++
++    init {
++        for (i in 0 until N) {
++            val s = i / (N - 1f)
++            val a = 1f - s
++            val a4 = a * a * a * a
++            val hgt = (1f - a4).coerceAtLeast(0f).pow(0.25f)
++            // slope dh/ds (in bezel-widths per bezel-width); infinite at s = 0, so cap the angle
++            val slope = if (s < 1e-3f) 1e3f else a * a * a / (1f - a4).coerceAtLeast(1e-6f).pow(0.75f)
++            val thetaI = atan(slope)
++            val sinT = (kotlin.math.sin(thetaI) / n).coerceIn(-1f, 1f)
++            val thetaT = asin(sinT)
++            val depth = thickness * 0.5f + hgt * thickness * 0.5f
++            shift[i] = depth * tan(thetaI - thetaT)
++        }
++    }
++
++    fun at(s: Float): Float {
++        if (s >= 1f) return 0f
++        val f = s.coerceAtLeast(0f) * (N - 1)
++        val i = f.toInt().coerceAtMost(N - 2)
++        val t = f - i
++        return shift[i] * (1f - t) + shift[i + 1] * t
++    }
++}
++
++// ============================================================================================
++// The baker
++// ============================================================================================
++
++/** The pre-blurred wallpaper-with-scrims that the glass looks through. [w]x[h] covers the whole screen. */
++class LgBackdrop(val w: Int, val h: Int, val argb: IntArray)
++
++/**
++ * Where the glass is on screen and how it should respond to its surroundings.
++ * [x],[y]: top-left of the element in screen px. [lumaMean]: 0..1 relative luminance of what's behind it.
++ */
++class LgParams(
++    val w: Int,
++    val h: Int,
++    val radius: Float,
++    val x: Float,
++    val y: Float,
++    val screenW: Int,
++    val screenH: Int,
++    val lumaMean: Float,
++    val density: Float = 1f,
++    /** false = draw only edge effects (rim, glow, dispersion fringe, shadow) and leave the middle clear. */
++    val opaqueInterior: Boolean = true,
++    val shadow: Boolean = true,
++    /** 0..1: how much a busy background is calmed toward its own average inside the glass (legibility). */
++    val calm: Float = 0f,
++    /** Average backdrop color of this element's region in linear light (0..1), the target of [calm]. */
++    val meanR: Float = 0.5f,
++    val meanG: Float = 0.5f,
++    val meanB: Float = 0.5f,
++    /** Adaptive scrim (0..1 opacity) mixed into what the glass sees, black if [scrimDark] else white. */
++    val scrim: Float = 0f,
++    val scrimDark: Boolean = true,
++    /** Black overlay already drawn between the wallpaper and this glass (a dialog dim), 0..1. */
++    val dim: Float = 0f,
++)
++
++/** Result bitmap: premultiplied ARGB, with [pad] px of room around the element for shadows. */
++class LgBake(val width: Int, val height: Int, val pad: Int, val argb: IntArray)
++
++private val profile = BezelProfile()
++
++private fun shadowPad(minSide: Float, density: Float): Int {
++    val k = min(1f, minSide / (200f * density))
++    return (LG.SHADOW_BLUR * density * (0.35f + 0.65f * k) + LG.SHADOW_OFFSET_Y * density).toInt() + 2
++}
++
++class LgSampler(private val bd: LgBackdrop, screenW: Int, screenH: Int) {
++    private val kx = bd.w.toFloat() / screenW
++    private val ky = bd.h.toFloat() / screenH
++
++    /** Reads one color channel (0 = R, 1 = G, 2 = B) with bilinear filtering at a screen-space point. */
++    fun channel(sx: Float, sy: Float, c: Int): Float {
++        val fx = (sx * kx - 0.5f).coerceIn(0f, bd.w - 1.001f)
++        val fy = (sy * ky - 0.5f).coerceIn(0f, bd.h - 1.001f)
++        val x0 = fx.toInt()
++        val y0 = fy.toInt()
++        val tx = fx - x0
++        val ty = fy - y0
++        val sh = 16 - 8 * c
++        val i = y0 * bd.w + x0
++        val a = (bd.argb[i] shr sh) and 255
++        val b = (bd.argb[i + 1] shr sh) and 255
++        val cc = (bd.argb[i + bd.w] shr sh) and 255
++        val d = (bd.argb[i + bd.w + 1] shr sh) and 255
++        val top = a + (b - a) * tx
++        val bot = cc + (d - cc) * tx
++        return (top + (bot - top) * ty) / 255f
++    }
++}
++
++/**
++ * Bakes one Liquid Glass element. This is the heart of the effect:
++ * 1. For each pixel inside the shape, find its depth into the rim and the inward normal.
++ * 2. Displace where we read the wallpaper from by the Snell's-law shift (zero in the middle, growing toward the
++ *    edge, and strong enough at the very border to flip). Red, green and blue use slightly different shifts.
++ * 3. Boost saturation, add a faint tint, adapt to bright backgrounds.
++ * 4. Add the specular rim (brightest top-left / bottom-right), inner glow, inner shadow.
++ * 5. Add drop shadow and contact shadow outside the shape.
++ */
++fun bakeLiquid(bd: LgBackdrop, p: LgParams): LgBake {
++    val d = p.density
++    val minSide = min(p.w, p.h).toFloat()
++    val pad = if (p.shadow) shadowPad(minSide, d) else 2
++    val bw = p.w + 2 * pad
++    val bh = p.h + 2 * pad
++    val out = IntArray(bw * bh)
++    val shape = LgShape(p.w.toFloat(), p.h.toFloat(), p.radius)
++    val sampler = LgSampler(bd, p.screenW, p.screenH)
++
++    val bezel = (minSide * LG.BEZEL_FRACTION).coerceIn(LG.BEZEL_MIN_PX * d, LG.BEZEL_MAX_PX * d)
++    val maxShift = bezel * profile.shift.max() // px, before strength
++    val strength = LG.REFRACTION_STRENGTH * LG.REFRACT_DIRECTION
++    val disp = LG.DISPERSION_PX * d
++    val cx = p.w / 2f
++    val cy = p.h / 2f
++
++    // Adapt highlights and shadows to the background: bright rims on dark, subtle on light.
++    val dark = 1f - smooth(0.08f, 0.55f, p.lumaMean)       // 1 on dark backgrounds
++    val rimK = LG.RIM_INTENSITY * (0.55f + 0.45f * dark)
++    val glowK = LG.GLOW_INTENSITY * (0.6f + 0.4f * dark)
++    val innerShK = LG.INNER_SHADOW_INTENSITY * (1.35f - 0.7f * dark)
++    val dropK = LG.SHADOW_ALPHA * (1.25f - 0.65f * dark)
++    val contactK = LG.CONTACT_ALPHA * (1.25f - 0.65f * dark)
++
++    val n = FloatArray(2)
++    val rimW = LG.RIM_WIDTH_PX * d
++    // the glow hugs the rim (it must not wash out text near it), so its width is fixed, not tied to the bezel
++    val glowW = min(6f * d, bezel * 0.9f)
++    val shadowBlur = LG.SHADOW_BLUR * d * (0.35f + 0.65f * min(1f, minSide / (200f * d)))
++    val contactBlur = LG.CONTACT_BLUR * d
++    val offY = LG.SHADOW_OFFSET_Y * d * (0.4f + 0.6f * min(1f, minSide / (200f * d)))
++    val cOffY = LG.CONTACT_OFFSET_Y * d
++
++    for (j in 0 until bh) {
++        val ly = j - pad + 0.5f
++        for (i in 0 until bw) {
++            val lx = i - pad + 0.5f
++            val sd = shape.sdf(lx, ly, n)
++            var r = 0f; var g = 0f; var b = 0f; var a = 0f
++
++            // ---- shadows (outside, and also faintly under the glass so thin glass still has weight) ----
++            if (p.shadow) {
++                val sdD = shape.sdf(lx, ly - offY, null)
++                val big = dropK * (1f - smooth(-shadowBlur * 0.35f, shadowBlur * 0.65f, sdD))
++                val sdC = shape.sdf(lx, ly - cOffY, null)
++                val small = contactK * (1f - smooth(-contactBlur * 0.5f, contactBlur, sdC))
++                val sh = 1f - (1f - big) * (1f - small)
++                a = sh
++            }
++
++            val cov = clamp01(0.5f - sd) // anti-aliased coverage of the glass body
++            if (cov > 0f) {
++                val u = (-sd).coerceAtLeast(0f)            // depth into the glass, px
++                val s = u / bezel                           // 0 at edge .. 1 at the end of the bezel
++                val shift = profile.at(s) * bezel * strength // px, along the inward normal (-n)
++                // inward direction is -n (n points outward)
++                val inX = -n[0]
++                val inY = -n[1]
++                // dispersion scales with how bent the ray is
++                val bend = if (maxShift > 0f) clamp01(abs(shift) / (maxShift * LG.REFRACTION_STRENGTH)) else 0f
++                val dj = disp * bend * (if (strength < 0f) -1f else 1f)
++                // flat middle: slight magnification toward the center
++                val mx = (lx - cx) * -LG.CENTER_MAGNIFY
++                val my = (ly - cy) * -LG.CENTER_MAGNIFY
++                val sxBase = p.x + lx + mx
++                val syBase = p.y + ly + my
++                var cr = sampler.channel(sxBase + inX * (shift + dj), syBase + inY * (shift + dj), 0)
++                var cg = sampler.channel(sxBase + inX * shift, syBase + inY * shift, 1)
++                var cb = sampler.channel(sxBase + inX * (shift - dj), syBase + inY * (shift - dj), 2)
++
++                if (p.dim > 0f) { val k = 1f - p.dim; cr *= k; cg *= k; cb *= k }
++
++                // ---- busy backgrounds get calmed toward their average so text stays readable ----
++                if (p.calm > 0f) {
++                    // blend in linear light (the region mean is a linear-light average), then back to gamma
++                    cr = (cr.pow(2.2f) * (1f - p.calm) + p.meanR * p.calm).pow(1f / 2.2f)
++                    cg = (cg.pow(2.2f) * (1f - p.calm) + p.meanG * p.calm).pow(1f / 2.2f)
++                    cb = (cb.pow(2.2f) * (1f - p.calm) + p.meanB * p.calm).pow(1f / 2.2f)
++                }
++
++                // ---- color: saturate, lift, tint ----
++                val lum = 0.2126f * cr + 0.7152f * cg + 0.0722f * cb
++                val sat = LG.SATURATION
++                cr = lum + (cr - lum) * sat
++                cg = lum + (cg - lum) * sat
++                cb = lum + (cb - lum) * sat
++                cr += LG.BRIGHTNESS_LIFT; cg += LG.BRIGHTNESS_LIFT; cb += LG.BRIGHTNESS_LIFT
++                // faint dark adaptation, per pixel, only where the picture is bright
++                val lg = clamp01(0.2126f * cr + 0.7152f * cg + 0.0722f * cb)
++                val darkTint = darkTintFor(lg)
++                cr = cr * (1f - darkTint); cg = cg * (1f - darkTint); cb = cb * (1f - darkTint)
++                val tw = LG.TINT_WHITE
++                cr = cr * (1f - tw) + tw; cg = cg * (1f - tw) + tw; cb = cb * (1f - tw) + tw
++
++                // saturation can push channels past 1; clamp first or a scrim would just eat the overshoot
++                cr = clamp01(cr); cg = clamp01(cg); cb = clamp01(cb)
++
++                // ---- adaptive scrim, applied after the color path (same order the legibility solver assumes) ----
++                if (p.scrim > 0f) {
++                    val k = 1f - p.scrim
++                    if (p.scrimDark) { cr *= k; cg *= k; cb *= k }
++                    else { cr = cr * k + p.scrim; cg = cg * k + p.scrim; cb = cb * k + p.scrim }
++                }
++
++                // ---- light: depends on which way the edge faces ----
++                val nl = n[0] * LG.LIGHT_X + n[1] * LG.LIGHT_Y   // +1 facing the light, -1 facing away
++                val spec = max(abs(nl).pow(1.6f) * (if (nl > 0f) 1f else 0.72f), 0.10f) // 2 lobes, weak sides
++                // thin rim: strongest right at the edge, gone after rimW
++                val rim = (1f - smooth(rimW * 0.35f, rimW * 1.25f, u)) * rimK * spec
++                // soft inner glow just inside the rim, mostly on the lit side
++                val glowSide = 0.35f + 0.65f * clamp01(nl * 0.5f + 0.5f)
++                val glow = exp(-u / glowW * 2.4f) * glowK * glowSide
++                // subtle inner shadow on the side facing away from the light, a bit further in
++                val away = clamp01(-nl)
++                val ish = (u - rimW * 2f) / (glowW * 0.8f)
++                val innerSh = away * exp(-(ish * ish)) * innerShK
++
++                var wr = cr; var wg = cg; var wb = cb
++                wr = wr * (1f - innerSh)
++                wg = wg * (1f - innerSh)
++                wb = wb * (1f - innerSh)
++                val add = glow + rim
++                wr = wr + (1f - wr) * add
++                wg = wg + (1f - wg) * add
++                wb = wb + (1f - wb) * add
++
++                if (p.opaqueInterior) {
++                    // glass body over the shadow
++                    val ga = cov
++                    r = clamp01(wr) * ga; g = clamp01(wg) * ga; b = clamp01(wb) * ga
++                    a = ga + a * (1f - ga)
++                    // shadow is dark, so tint what shows through the partial edge
++                } else {
++                    // edge effects only: premultiplied white highlight + dark inner shadow + color fringe
++                    val fill = 0.14f * cov                       // a faint white body so the control still reads as glass
++                    val hiA = clamp01(rim + glow * 0.7f) * cov
++                    val hi = hiA + fill * (1f - hiA)
++                    val shA = innerSh * 0.9f * cov
++                    val fr = clamp01((cr - cg) * 3f) * bend * 0.25f * cov
++                    val fb = clamp01((cb - cg) * 3f) * bend * 0.25f * cov
++                    r = hi + fr
++                    g = hi
++                    b = hi + fb
++                    val ca = clamp01(hi + shA + max(fr, fb))
++                    a = ca + a * (1f - ca)
++                }
++            }
++            val ai = (clamp01(a) * 255f + 0.5f).toInt()
++            val ri = (clamp01(r) * 255f + 0.5f).toInt().coerceAtMost(ai)
++            val gi = (clamp01(g) * 255f + 0.5f).toInt().coerceAtMost(ai)
++            val bi = (clamp01(b) * 255f + 0.5f).toInt().coerceAtMost(ai)
++            out[j * bw + i] = (ai shl 24) or (ri shl 16) or (gi shl 8) or bi
++        }
++    }
++    return LgBake(bw, bh, pad, out)
++}
++
++// ============================================================================================
++// Backdrop construction (wallpaper + scrims, small blur)
++// ============================================================================================
++
++/** Box blur, [passes] times in each direction. Three passes of a small box is close to a Gaussian. */
++fun blurArgb(src: IntArray, w: Int, h: Int, radius: Int, passes: Int): IntArray {
++    var a = src.copyOf()
++    var b = IntArray(src.size)
++    if (radius <= 0) return a
++    val n = 2 * radius + 1
++    repeat(passes) {
++        for (y in 0 until h) {
++            for (x in 0 until w) {
++                var sr = 0; var sg = 0; var sb = 0
++                for (k in -radius..radius) {
++                    val p = a[y * w + (x + k).coerceIn(0, w - 1)]
++                    sr += (p shr 16) and 255; sg += (p shr 8) and 255; sb += p and 255
++                }
++                b[y * w + x] = (0xFF shl 24) or ((sr / n) shl 16) or ((sg / n) shl 8) or (sb / n)
++            }
++        }
++        for (y in 0 until h) {
++            for (x in 0 until w) {
++                var sr = 0; var sg = 0; var sb = 0
++                for (k in -radius..radius) {
++                    val p = b[(y + k).coerceIn(0, h - 1) * w + x]
++                    sr += (p shr 16) and 255; sg += (p shr 8) and 255; sb += p and 255
++                }
++                a[y * w + x] = (0xFF shl 24) or ((sr / n) shl 16) or ((sg / n) shl 8) or (sb / n)
++            }
++        }
++    }
++    return a
++}
++
++/**
++ * Applies the launcher's two black scrims (a left-to-right one and a bottom one) to wallpaper pixels, exactly as
++ * MainActivity draws them. Without this the glass would show a brighter picture than the UI around it.
++ */
++fun applyLauncherScrims(px: IntArray, w: Int, h: Int, scrimA: Float): IntArray {
++    val out = IntArray(px.size)
++    for (y in 0 until h) {
++        val fy = (y + 0.5f) / h
++        val vA = scrimA * 0.9f * clamp01((fy - 0.55f) / 0.45f)
++        for (x in 0 until w) {
++            val fx = (x + 0.5f) / w
++            val hA = scrimA * (1f - clamp01(fx / 0.62f))
++            val p = px[y * w + x]
++            val keep = (1f - hA) * (1f - vA) // two black layers over each other
++            val r = (((p shr 16) and 255) * keep).toInt()
++            val g = (((p shr 8) and 255) * keep).toInt()
++            val b = ((p and 255) * keep).toInt()
++            out[y * w + x] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
++        }
++    }
++    return out
++}
++
++// ============================================================================================
++// Legibility
++// ============================================================================================
++
++/** What the glass looks like to the eye for a given backdrop pixel (same color path as bakeLiquid). */
++fun seenThroughGlass(argb: Int): Int {
++    var r = ((argb shr 16) and 255) / 255f
++    var g = ((argb shr 8) and 255) / 255f
++    var b = (argb and 255) / 255f
++    val lum = 0.2126f * r + 0.7152f * g + 0.0722f * b
++    r = lum + (r - lum) * LG.SATURATION
++    g = lum + (g - lum) * LG.SATURATION
++    b = lum + (b - lum) * LG.SATURATION
++    r += LG.BRIGHTNESS_LIFT; g += LG.BRIGHTNESS_LIFT; b += LG.BRIGHTNESS_LIFT
++    val dt = darkTintFor(clamp01(0.2126f * r + 0.7152f * g + 0.0722f * b))
++    r *= (1f - dt); g *= (1f - dt); b *= (1f - dt)
++    val tw = LG.TINT_WHITE
++    r = r * (1f - tw) + tw; g = g * (1f - tw) + tw; b = b * (1f - tw) + tw
++    return (0xFF shl 24) or ((clamp01(r) * 255 + 0.5f).toInt() shl 16) or ((clamp01(g) * 255 + 0.5f).toInt() shl 8) or
++        (clamp01(b) * 255 + 0.5f).toInt()
++}
++
++/** Region growth to pass to [analyzeRegion]: the bezel (rim area counts) minus the box corners a rounded shape cuts off. */
++fun analysisGrow(bezel: Float, radius: Float): Float = bezel - 0.29f * radius
++
++/** A small (about 64px wide) copy of what is behind the glass, used for luminance sampling. */
++class LumaMap(val w: Int, val h: Int, val argb: IntArray)
++
++/** Luminance statistics of a screen region, as seen through the glass. */
++class RegionStats(
++    val mean: Float,
++    val p10: Float,
++    val p90: Float,
++    /** p90 - p10: how patchy the region is. */
++    val spread: Float,
++    /** Average raw backdrop color in LINEAR light (0..1), before the glass color path. */
++    val meanR: Float = 0.5f,
++    val meanG: Float = 0.5f,
++    val meanB: Float = 0.5f,
++)
++
++/**
++ * Measures the region [x0,y0,x1,y1] (screen px). The region is grown by the bezel so the distorted rim
++ * is included, since refraction pulls background in from there. Pixels are run through the glass color path first.
++ */
++fun analyzeRegion(map: LumaMap, screenW: Int, screenH: Int, x0: Float, y0: Float, x1: Float, y1: Float, grow: Float, dim: Float = 0f): RegionStats {
++    // [grow] may be negative (round shapes: the box corners are not part of the glass)
++    val kx = map.w.toFloat() / screenW
++    val ky = map.h.toFloat() / screenH
++    val ax = (((x0 - grow) * kx).toInt()).coerceIn(0, map.w - 1)
++    val ay = (((y0 - grow) * ky).toInt()).coerceIn(0, map.h - 1)
++    val bx = (((x1 + grow) * kx).toInt()).coerceIn(ax, map.w - 1)
++    val by = (((y1 + grow) * ky).toInt()).coerceIn(ay, map.h - 1)
++    val ls = FloatArray((bx - ax + 1) * (by - ay + 1))
++    var k = 0
++    var sum = 0f
++    var sr = 0f; var sg = 0f; var sb = 0f
++    for (y in ay..by) for (x in ax..bx) {
++        var px = map.argb[y * map.w + x]
++        if (dim > 0f) {
++            val k = 1f - dim
++            px = (0xFF shl 24) or ((((px shr 16) and 255) * k).toInt() shl 16) or ((((px shr 8) and 255) * k).toInt() shl 8) or ((px and 255) * k).toInt()
++        }
++        val l = relLuminance(seenThroughGlass(px))
++        ls[k++] = l
++        sum += l
++        sr += LIN[(px shr 16) and 255]; sg += LIN[(px shr 8) and 255]; sb += LIN[px and 255]
++    }
++    ls.sort()
++    val cnt = ls.size
++    val p10 = ls[((cnt - 1) * 0.10f).toInt()]
++    val p90 = ls[((cnt - 1) * 0.90f).toInt()]
++    return RegionStats(sum / cnt, p10, p90, p90 - p10, sr / cnt, sg / cnt, sb / cnt)
++}
++
++/** The decision for one glass element. */
++class FgChoice(
++    val fg: Int,
++    /** 0..1, black or white scrim opacity to add behind the glass (0 = none). */
++    val scrim: Float,
++    val scrimIsDark: Boolean,
++    /** 0..1: how much a busy backdrop is calmed toward its average (last resort, only when a scrim is not enough). */
++    val calm: Float,
++    /** Text-shadow alpha (0 = none); the shadow is the opposite color of [fg]. */
++    val shadow: Float,
++    /** Predicted worst-case contrast of [fg] against the region, after scrim and calm. */
++    val contrast: Float,
++    val usesLight: Boolean,
++    /** Luminance of the background right behind the text (worst case for [fg], after scrim and calm). */
++    val bgL: Float = 0.5f,
++)
++
++/** Luminance after a black or white scrim. Scrims blend in sRGB (gamma) space, so convert there and back. */
++private fun lumAfterScrim(l: Float, scrim: Float, dark: Boolean): Float {
++    val c = l.coerceAtLeast(0f).pow(1f / 2.2f)
++    val c2 = if (dark) c * (1f - scrim) else c * (1f - scrim) + scrim
++    return c2.pow(2.2f)
++}
++
++/** Contrast of white against a background of luminance [l]. */
++fun contrastWhite(l: Float) = contrastRatio(1f, l)
++fun contrastDark(l: Float) = contrastRatio(relLuminance(LG.FG_DARK), l)
++
++/**
++ * Picks light or dark foreground and the least help it needs.
++ *
++ * 1. Compare the WCAG contrast of white and near-black (not a 50% threshold), judging each by its worst case
++ *    (white by the bright 90th percentile, dark by the dark 10th), blended with the mean.
++ * 2. If the winner is below [target], search for the cheapest combination of scrim (preferred) and calm
++ *    (last resort, flattens a patchy backdrop) that reaches it.
++ * 3. [prevLight] (if known) adds hysteresis: the color only flips if the other is clearly better.
++ */
++fun chooseForeground(s: RegionStats, target: Float, prevLight: Boolean?): FgChoice {
++    val wt = LG.WORST_WEIGHT
++    fun lightL(calm: Float) = max(s.mean, s.mean + wt * (s.p90 - s.mean) * (1f - calm))
++    fun darkL(calm: Float) = min(s.mean, s.mean + wt * (s.p10 - s.mean) * (1f - calm))
++    fun cLight(sc: Float, calm: Float) = contrastWhite(lumAfterScrim(lightL(calm), sc, true))
++    fun cDark(sc: Float, calm: Float) = contrastDark(lumAfterScrim(darkL(calm), sc, false))
++
++    class Plan(val scrim: Float, val calm: Float, val contrast: Float, val ok: Boolean, val bgL: Float) {
++        val cost get() = scrim + 0.5f * calm
++    }
++    fun plan(light: Boolean): Plan {
++        var best: Plan? = null
++        var calm = 0f
++        while (calm <= LG.CALM_MAX + 1e-4f) {
++            var sc = 0f
++            while (sc <= LG.MAX_SCRIM + 1e-4f) {
++                val c = if (light) cLight(sc, calm) else cDark(sc, calm)
++                if (c >= target) {
++                    val p = Plan(sc, calm, c, true, if (light) lumAfterScrim(lightL(calm), sc, true) else lumAfterScrim(darkL(calm), sc, false))
++                    if (best == null || p.cost < best.cost - 1e-4f) best = p
++                    break // more scrim at this calm only costs more
++                }
++                sc += 0.01f
++            }
++            calm += 0.1f
++        }
++        return best ?: Plan(
++            LG.MAX_SCRIM, LG.CALM_MAX,
++            if (light) cLight(LG.MAX_SCRIM, LG.CALM_MAX) else cDark(LG.MAX_SCRIM, LG.CALM_MAX), false,
++            if (light) lumAfterScrim(lightL(LG.CALM_MAX), LG.MAX_SCRIM, true) else lumAfterScrim(darkL(LG.CALM_MAX), LG.MAX_SCRIM, false),
++        )
++    }
++    val pl = plan(true)
++    val pd = plan(false)
++    val w0 = cLight(0f, 0f)
++    val d0 = cDark(0f, 0f)
++    var useLight = when (prevLight) {
++        true -> !(d0 > w0 * LG.HYSTERESIS)
++        false -> w0 > d0 * LG.HYSTERESIS
++        null -> w0 >= d0
++    }
++    // if the contrast winner needs a lot of help and the other needs clearly less, go with the cheaper one
++    val chosen0 = if (useLight) pl else pd
++    val other0 = if (useLight) pd else pl
++    if (chosen0.cost > 0.12f && other0.ok && other0.cost < chosen0.cost - 0.06f) useLight = !useLight
++    val pick = if (useLight) pl else pd
++    val busy = s.spread > 0.18f
++    return FgChoice(
++        fg = if (useLight) LG.FG_LIGHT else LG.FG_DARK,
++        scrim = pick.scrim,
++        scrimIsDark = useLight,
++        calm = pick.calm,
++        shadow = if (busy || pick.contrast < target + 0.8f) 0.24f else 0f,
++        contrast = pick.contrast,
++        usesLight = useLight,
++        bgL = pick.bgL,
++    )
++}
++
++/**
++ * Nudges a hue-bearing color ([argb], usually the wallpaper accent) lighter or darker until it reaches [target]
++ * contrast on a background of luminance [bgL]. Keeps the hue so accent text stays "accent", but legible.
++ */
++fun adaptAccent(argb: Int, bgL: Float, target: Float): Int {
++    var r = ((argb shr 16) and 255) / 255f
++    var g = ((argb shr 8) and 255) / 255f
++    var b = (argb and 255) / 255f
++    val towardWhite = contrastWhite(bgL) >= contrastDark(bgL)
++    for (i in 0..20) {
++        val l = relLuminance(
++            (0xFF shl 24) or ((r * 255).toInt() shl 16) or ((g * 255).toInt() shl 8) or (b * 255).toInt(),
++        )
++        if (contrastRatio(l, bgL) >= target) break
++        val t = 0.1f
++        if (towardWhite) { r += (1f - r) * t; g += (1f - g) * t; b += (1f - b) * t }
++        else { r *= (1f - t); g *= (1f - t); b *= (1f - t) }
++    }
++    return (0xFF shl 24) or ((clamp01(r) * 255 + 0.5f).toInt() shl 16) or ((clamp01(g) * 255 + 0.5f).toInt() shl 8) or
++        (clamp01(b) * 255 + 0.5f).toInt()
++}
++
++// ============================================================================================
++// Building the backdrop + luminance map from a wallpaper
++// ============================================================================================
++
++/** Average-downscale an ARGB image to [ow]x[oh]. */
++fun boxDownArgb(src: IntArray, w: Int, h: Int, ow: Int, oh: Int): IntArray {
++    val o = IntArray(ow * oh)
++    for (y in 0 until oh) for (x in 0 until ow) {
++        val x0 = x * w / ow; val x1 = max(x0 + 1, (x + 1) * w / ow)
++        val y0 = y * h / oh; val y1 = max(y0 + 1, (y + 1) * h / oh)
++        var r = 0L; var g = 0L; var b = 0L; var n = 0
++        for (yy in y0 until y1) for (xx in x0 until x1) {
++            val p = src[yy * w + xx]
++            r += (p shr 16) and 255; g += (p shr 8) and 255; b += p and 255; n++
++        }
++        o[y * ow + x] = (0xFF shl 24) or ((r / n).toInt() shl 16) or ((g / n).toInt() shl 8) or (b / n).toInt()
++    }
++    return o
++}
++
++class LiquidData(val backdrop: LgBackdrop, val luma: LumaMap)
++
++/**
++ * [px] is the wallpaper already cropped to the screen's aspect and scaled to [w]x[h] (about 960 wide).
++ * Result: the backdrop the glass looks through (launcher scrims applied, small blur) and the ~64px luminance map.
++ * [screenWidthPx] sets the blur: LG.BLUR_PX is in screen pixels.
++ */
++fun buildLiquidData(px: IntArray, w: Int, h: Int, scrimA: Float, screenWidthPx: Int): LiquidData {
++    val scrimmed = applyLauncherScrims(px, w, h, scrimA)
++    // blur sigma in backdrop px = BLUR_PX * (backdrop width / screen width); two passes of a box give sigma ~ r
++    val sigma = LG.BLUR_PX * w.toFloat() / max(1, screenWidthPx)
++    val r = sigma.toInt().coerceIn(1, 4)
++    val blurred = blurArgb(scrimmed, w, h, r, 2)
++    val lw = LG.SAMPLE_W
++    val lh = max(8, (lw.toFloat() * h / w).toInt())
++    return LiquidData(LgBackdrop(w, h, blurred), LumaMap(lw, lh, boxDownArgb(scrimmed, w, h, lw, lh)))
++}
+diff --git a/LiquidGlass.kt b/LiquidGlass.kt
+new file mode 100644
+index 0000000..8a6cdf1
+--- /dev/null
++++ b/LiquidGlass.kt
+@@ -0,0 +1,345 @@
++package com.unwind.launcher
++
++import android.graphics.Bitmap
++import android.util.LruCache
++import androidx.compose.animation.animateColorAsState
++import androidx.compose.animation.core.Animatable
++import androidx.compose.animation.core.animateFloatAsState
++import androidx.compose.animation.core.tween
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.BoxScope
++import androidx.compose.material3.ProvideTextStyle
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.runtime.Immutable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.Stable
++import androidx.compose.runtime.compositionLocalOf
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.snapshotFlow
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.drawWithCache
++import androidx.compose.ui.geometry.Offset
++import androidx.compose.ui.geometry.Size
++import androidx.compose.ui.graphics.Brush
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.ImageBitmap
++import androidx.compose.ui.graphics.Outline
++import androidx.compose.ui.graphics.Shadow
++import androidx.compose.ui.graphics.Shape
++import androidx.compose.ui.graphics.asImageBitmap
++import androidx.compose.ui.graphics.drawscope.Stroke
++import androidx.compose.ui.graphics.drawscope.clipPath
++import androidx.compose.ui.graphics.toArgb
++import androidx.compose.ui.layout.onGloballyPositioned
++import androidx.compose.ui.layout.positionInRoot
++import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.platform.LocalLayoutDirection
++import androidx.compose.ui.text.TextStyle
++import androidx.compose.ui.unit.Density
++import androidx.compose.ui.unit.IntOffset
++import androidx.compose.ui.unit.IntSize
++import androidx.compose.ui.unit.LayoutDirection
++import androidx.compose.ui.unit.dp
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.collectLatest
++import kotlinx.coroutines.withContext
++import kotlin.math.min
++import kotlin.math.roundToInt
++
++/*
++ * Liquid Glass, Compose side. The math lives in LiquidCore.kt (pure Kotlin, tested on a JVM); this file:
++ *  - measures where each glass element is,
++ *  - decides its foreground color from the wallpaper behind it (per element, with hysteresis),
++ *  - bakes the refracted glass on a background thread and caches it,
++ *  - cross-fades between bakes and foreground colors,
++ *  - hands the foreground color to whatever is drawn on the glass (see inkFg / inkAccent).
++ */
++
++// ---------- What content on glass should use ----------
++
++/** The adaptive foreground for one glass element. Null (no provider) means "use the original colors". */
++@Immutable
++class GlassInk(val fg: Color, val accent: Color, val shadow: Float)
++
++val LocalGlassInk = compositionLocalOf<GlassInk?> { null }
++
++/** A black overlay that dialogs draw between the wallpaper and their glass (0..1). */
++val LocalGlassDim = compositionLocalOf { 0f }
++
++/** Text or icons under this alpha would drop below the contrast target, so on adaptive glass it is raised to this. */
++private const val INK_MIN_ALPHA = 0.88f
++
++/** Use for white text/icons on glass. On Liquid glass it flips between white and near-black as needed. */
++@Composable
++fun inkFg(default: Color = Color.White): Color {
++    val ink = LocalGlassInk.current ?: return default
++    return ink.fg.copy(alpha = maxOf(default.alpha, INK_MIN_ALPHA))
++}
++
++/** Use for accent-colored text/icons on glass: keeps the hue, shifts lightness until it is readable. */
++@Composable
++fun inkAccent(default: Color): Color {
++    val ink = LocalGlassInk.current ?: return default
++    return ink.accent.copy(alpha = maxOf(default.alpha, INK_MIN_ALPHA))
++}
++
++// ---------- Per-element state ----------
++
++@Stable
++class GlassNode {
++    var pos by mutableStateOf(IntOffset.Zero)
++    var size by mutableStateOf(IntSize.Zero)
++    var choice by mutableStateOf<FgChoice?>(null)
++}
++
++private class Baked(val image: ImageBitmap, val pad: Int)
++
++@Stable
++private class LiquidLook {
++    var cur by mutableStateOf<Baked?>(null)
++    var prev by mutableStateOf<Baked?>(null)
++    val fade = Animatable(1f)
++    var prevLight: Boolean? = null
++}
++
++private object LiquidCache {
++    val lru = object : LruCache<String, Baked>(28 * 1024 * 1024) {
++        override fun sizeOf(key: String, value: Baked): Int = value.image.width * value.image.height * 4
++    }
++}
++
++private fun LgBake.toImage(): ImageBitmap {
++    // the baker produces premultiplied pixels; Bitmap.setPixels wants straight alpha
++    val out = IntArray(argb.size)
++    for (i in argb.indices) {
++        val p = argb[i]
++        val a = p ushr 24
++        out[i] = if (a == 0 || a == 255) {
++            p
++        } else {
++            val r = (((p shr 16) and 255) * 255 / a).coerceAtMost(255)
++            val g = (((p shr 8) and 255) * 255 / a).coerceAtMost(255)
++            val b = ((p and 255) * 255 / a).coerceAtMost(255)
++            (a shl 24) or (r shl 16) or (g shl 8) or b
++        }
++    }
++    val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
++    bmp.setPixels(out, 0, width, 0, 0, width, height)
++    return bmp.asImageBitmap()
++}
++
++private fun cornerRadiusPx(shape: Shape, size: Size, dir: LayoutDirection, d: Density): Float =
++    when (val o = shape.createOutline(size, dir, d)) {
++        is Outline.Rounded -> o.roundRect.topLeftCornerRadius.x
++        is Outline.Rectangle -> 0f
++        is Outline.Generic -> min(size.width, size.height) * 0.25f // e.g. the hexagon: approximated, then clipped to its real path
++    }
++
++/**
++ * Watches one glass element: where it is, what is behind it, which foreground it needs, and bakes the glass.
++ * Re-runs when the wallpaper, the element's position or size, or the density changes. While an element is moving
++ * (scrolling) the previous bake keeps drawing and the new one is made once it settles.
++ */
++@Composable
++private fun rememberLiquidLook(node: GlassNode, shape: Shape, enabled: Boolean, strict: Boolean, overlayOnly: Boolean): LiquidLook {
++    val ui = LocalUi.current
++    val dens = LocalDensity.current
++    val dir = LocalLayoutDirection.current
++    val dim = LocalGlassDim.current
++    val look = remember { LiquidLook() }
++    val data = ui.backdrops?.liquid
++    val screen = ui.size
++    LaunchedEffect(enabled, data, screen, strict, overlayOnly, dens.density, dim) {
++        val dd = data
++        if (!enabled || dd == null || screen.width <= 0 || screen.height <= 0) return@LaunchedEffect
++        // Position and size are read through a snapshot flow, not in composition, so scrolling does not recompose.
++        snapshotFlow { Pair(node.pos, node.size) }.collectLatest { (pos, sz) ->
++            if (sz.width < 4 || sz.height < 4) return@collectLatest
++            // while the element is moving the previous bake keeps drawing; this waits until it settles
++            if (look.cur != null) delay(90)
++            val d = dens.density
++            val w = sz.width
++            val h = sz.height
++            val sizeF = Size(w.toFloat(), h.toFloat())
++            val generic = shape.createOutline(sizeF, dir, dens) is Outline.Generic
++            val radius = cornerRadiusPx(shape, sizeF, dir, dens)
++            val bezel = (min(w, h) * LG.BEZEL_FRACTION).coerceIn(LG.BEZEL_MIN_PX * d, LG.BEZEL_MAX_PX * d)
++            val x = pos.x.toFloat()
++            val y = pos.y.toFloat()
++            // Judge the region this glass actually covers, rim included, as the glass will show it
++            val st = analyzeRegion(dd.luma, screen.width, screen.height, x, y, x + w, y + h, analysisGrow(bezel, radius), dim)
++            val target = (if (strict) LG.TEXT_CONTRAST else LG.ICON_CONTRAST) + LG.SOLVER_MARGIN
++            val ch = chooseForeground(st, target, look.prevLight)
++            look.prevLight = ch.usesLight
++            node.choice = ch
++
++            val key = "${System.identityHashCode(dd)}|$w|$h|${radius.toInt()}|${x.toInt()}|${y.toInt()}|" +
++                "${(ch.scrim * 100).toInt()}|${(ch.calm * 10).toInt()}|${ch.scrimIsDark}|${(st.mean * 24).toInt()}|" +
++                "$overlayOnly|${(dim * 100).toInt()}|${(d * 100).toInt()}|$generic"
++            val baked = LiquidCache.lru.get(key) ?: withContext(Dispatchers.Default) {
++                val p = LgParams(
++                    w = w, h = h, radius = radius, x = x, y = y,
++                    screenW = screen.width, screenH = screen.height,
++                    lumaMean = st.mean, density = d,
++                    opaqueInterior = !overlayOnly, shadow = !generic,
++                    calm = ch.calm, meanR = st.meanR, meanG = st.meanG, meanB = st.meanB,
++                    scrim = ch.scrim, scrimDark = ch.scrimIsDark, dim = dim,
++                )
++                val bk = bakeLiquid(dd.backdrop, p)
++                Baked(bk.toImage(), bk.pad)
++            }.also { LiquidCache.lru.put(key, it) }
++
++            if (look.cur !== baked) {
++                val had = look.cur != null
++                look.prev = look.cur
++                look.cur = baked
++                look.fade.snapTo(if (had) 0f else 1f)
++                if (had) look.fade.animateTo(1f, tween(LG.COLOR_FADE_MS))
++            }
++        }
++    }
++    return look
++}
++
++// ---------- The modifier ----------
++
++/**
++ * Liquid Glass surface. Draws the baked refraction/shading, plus the live parts: on focus the rim brightens and the
++ * focus ring swells in with the shared spring. Callers handle the scale-up (they already spring-scale on focus).
++ * [overlayOnly]: draw just the edge effects and leave the middle clear (for small controls sitting on other UI).
++ */
++@Composable
++internal fun Modifier.liquidGlass(
++    shape: Shape,
++    focused: Boolean,
++    idle: Boolean,
++    node: GlassNode,
++    strict: Boolean,
++    overlayOnly: Boolean,
++): Modifier {
++    val look = rememberLiquidLook(node, shape, idle || focused, strict, overlayOnly)
++    val lift = animateFloatAsState(if (focused) 1f else 0f, animationSpec = LiquidSpring, label = "liquidLift")
++    return this
++        .onGloballyPositioned {
++            val p = it.positionInRoot()
++            node.pos = IntOffset(p.x.roundToInt(), p.y.roundToInt())
++            node.size = it.size
++        }
++        .drawWithCache {
++            val outline = shape.createOutline(size, layoutDirection, this)
++            val path = outline.asPath()
++            val generic = outline is Outline.Generic
++            val ring = insetPath(shape, size, 1.25.dp.toPx(), layoutDirection, this)
++            val rimW = 1.5.dp.toPx()
++            val focusW = 2.5.dp.toPx()
++            onDrawBehind {
++                val p = lift.value.coerceIn(0f, 1.25f)
++                if (!idle && p < 0.01f) return@onDrawBehind
++                val cur = look.cur
++                if (cur == null) {
++                    // first bake is on its way
++                    drawPath(path, Color.White.copy(alpha = 0.10f))
++                } else {
++                    val prev = look.prev
++                    val f = look.fade.value
++                    if (generic) {
++                        clipPath(path) {
++                            if (prev != null && f < 1f) drawImage(prev.image, topLeft = Offset(-prev.pad.toFloat(), -prev.pad.toFloat()))
++                            drawImage(cur.image, topLeft = Offset(-cur.pad.toFloat(), -cur.pad.toFloat()), alpha = f)
++                        }
++                    } else {
++                        if (prev != null && f < 1f) drawImage(prev.image, topLeft = Offset(-prev.pad.toFloat(), -prev.pad.toFloat()))
++                        drawImage(cur.image, topLeft = Offset(-cur.pad.toFloat(), -cur.pad.toFloat()), alpha = f)
++                    }
++                }
++                if (p > 0.02f) {
++                    val a = min(1f, p)
++                    // highlights brighten (more on the lit corners), then the focus ring
++                    drawPath(
++                        ring,
++                        Brush.linearGradient(
++                            0f to Color.White.copy(alpha = 0.95f * a),
++                            0.5f to Color.White.copy(alpha = 0.20f * a),
++                            1f to Color.White.copy(alpha = 0.75f * a),
++                            start = Offset.Zero,
++                            end = Offset(size.width, size.height),
++                        ),
++                        style = Stroke(width = rimW),
++                    )
++                    drawPath(ring, Color.White.copy(alpha = a), style = Stroke(width = focusW))
++                }
++            }
++        }
++}
++
++// ---------- The wrapper that also hands content its foreground ----------
++
++/**
++ * A glass surface that also tells what is drawn on it which color to use. Same look as `Modifier.glass`; use this
++ * when the content has text or monochrome icons (read the color with [inkFg] / [inkAccent]).
++ * In Normal and Frost it simply draws the original glass and the content keeps its original colors.
++ *
++ * [strict] = true: text (4.5:1). false: icons and glyphs only (3:1).
++ */
++@Composable
++fun GlassBox(
++    modifier: Modifier,
++    shape: Shape,
++    focused: Boolean = false,
++    style: GlassStyle? = null,
++    blur: Boolean = true,
++    idle: Boolean = true,
++    strict: Boolean = true,
++    overlayOnly: Boolean = false,
++    contentAlignment: Alignment = Alignment.TopStart,
++    content: @Composable BoxScope.() -> Unit,
++) {
++    val ui = LocalUi.current
++    val node = remember { GlassNode() }
++    val liquid = (style ?: ui.settings.glass) == GlassStyle.Liquid && ui.backdrops?.liquid != null
++    Box(modifier.glass(shape, focused, style, blur, idle, node, strict, overlayOnly), contentAlignment) {
++        if (liquid) {
++            val ch = node.choice
++            val fade = tween<Color>(LG.COLOR_FADE_MS)
++            val fg by animateColorAsState(Color(ch?.fg ?: LG.FG_LIGHT), fade, label = "inkFg")
++            val accentTarget = if (ch != null) {
++                Color(adaptAccent(ui.wp.accent.toArgb(), ch.bgL, if (strict) LG.TEXT_CONTRAST else LG.ICON_CONTRAST))
++            } else {
++                ui.wp.accent
++            }
++            val accent by animateColorAsState(accentTarget, fade, label = "inkAccent")
++            val shadow by animateFloatAsState(ch?.shadow ?: 0f, tween(LG.COLOR_FADE_MS), label = "inkShadow")
++            val ink = remember(fg, accent, shadow) { GlassInk(fg, accent, shadow) }
++            // a very soft shadow in the opposite color separates letters from a busy refracted background
++            val textStyle = if (shadow > 0.01f) {
++                val c = if (ch?.usesLight == false) Color.White else Color.Black
++                TextStyle(shadow = Shadow(color = c.copy(alpha = shadow), offset = Offset(0f, 1.5f), blurRadius = 6f))
++            } else {
++                TextStyle.Default
++            }
++            CompositionLocalProvider(LocalGlassInk provides ink) {
++                ProvideTextStyle(textStyle) { content() }
++            }
++        } else {
++            content()
++        }
++    }
++}
++
++/** A glass surface only when [on]; otherwise a plain Box (used where the dock bar is optional). */
++@Composable
++fun OptGlass(
++    on: Boolean,
++    modifier: Modifier,
++    shape: Shape,
++    strict: Boolean = false,
++    content: @Composable BoxScope.() -> Unit,
++) {
++    if (on) GlassBox(modifier, shape, strict = strict, content = content) else Box(modifier, content = content)
++}
+diff --git a/MainActivity.kt b/MainActivity.kt
+index 1e47b00..15c4e51 100644
+--- a/MainActivity.kt
++++ b/MainActivity.kt
+@@ -201,7 +201,10 @@ fun LauncherApp(tick: Int, homeTick: Int) {
+         val w = wall
+         if (w != null && rootSize.width > 0 && rootSize.height > 0) {
+             val aspect = rootSize.width.toFloat() / rootSize.height
+-            backdrops = withContext(Dispatchers.Default) { makeBackdrops(w.bitmap, aspect) }
++            // same scrim strength the launcher draws over the wallpaper, so the glass sees what is really behind it
++            val sa = (0.45f + 0.35f * w.wp.luma).coerceIn(0.45f, 0.85f)
++            val sw = rootSize.width
++            backdrops = withContext(Dispatchers.Default) { makeBackdrops(w.bitmap, aspect, sa, sw) }
+         }
+     }
+     // Bing image of the day: check when opened and then every half hour while the launcher is up
+diff --git a/Screens.kt b/Screens.kt
+index 1505bf9..a720cc0 100644
+--- a/Screens.kt
++++ b/Screens.kt
+@@ -126,8 +126,10 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
+             if (!stacked) {
+                 Spacer(Modifier.weight(1f))
+                 // Endless row. With the dock on, the glass bar stays put and the apps slide across it.
+-                Box(
+-                    if (dock) Modifier.padding(end = 24.dp).offset(x = -dockPad).glass(dockShape) else Modifier,
++                OptGlass(
++                    dock,
++                    if (dock) Modifier.padding(end = 24.dp).offset(x = -dockPad) else Modifier,
++                    dockShape,
+                 ) {
+                     LazyRow(
+                         horizontalArrangement = Arrangement.spacedBy(gap),
+@@ -161,9 +163,10 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
+                     Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 18.dp)) {
+                         rows.forEachIndexed { ri, row ->
+                             if (ri > 0) Spacer(Modifier.height(14.dp))
++                            OptGlass(ri == 0 && dock, Modifier, dockShape) {
+                             Row(
+                                 if (ri == 0 && dock) {
+-                                    Modifier.glass(dockShape).padding(horizontal = dockPad, vertical = 14.dp)
++                                    Modifier.padding(horizontal = dockPad, vertical = 14.dp)
+                                 } else {
+                                     Modifier.padding(start = side)
+                                 },
+@@ -180,6 +183,7 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
+                                     )
+                                 }
+                             }
++                            }
+                         }
+                     }
+                 }
+@@ -242,20 +246,22 @@ fun KeyCap(label: String, w: Dp, modifier: Modifier, active: Boolean = false, on
+     val ui = LocalUi.current
+     var focused by remember { mutableStateOf(false) }
+     val scale by animateFloatAsState(if (focused) 1.08f else 1f, animationSpec = LiquidSpring, label = "key")
+-    Box(
++    GlassBox(
+         modifier
+             .size(w, 38.dp)
+             .graphicsLayer { scaleX = scale; scaleY = scale }
+-            .glass(RoundedCornerShape(10.dp), focused, blur = false)
+             .onFocusChanged { focused = it.isFocused }
+             .clickable(
+                 interactionSource = remember { MutableInteractionSource() },
+                 indication = null,
+                 onClick = onClick,
+             ),
++        RoundedCornerShape(10.dp),
++        focused,
++        blur = false,
+         contentAlignment = Alignment.Center,
+     ) {
+-        Text(label, color = if (focused || active) ui.wp.accent else Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
++        Text(label, color = if (focused || active) inkAccent(ui.wp.accent) else inkFg(), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+     }
+ }
+ 
+@@ -275,20 +281,26 @@ fun SearchScreen(apps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (AppE
+     }
+     Row(Modifier.fillMaxSize().padding(start = 150.dp, top = 84.dp, end = 24.dp, bottom = 24.dp)) {
+         Column(Modifier.width(392.dp)) {
++            GlassBox(
++                Modifier.fillMaxWidth().height(44.dp),
++                RoundedCornerShape(22.dp),
++                contentAlignment = Alignment.CenterStart,
++            ) {
+             Row(
+-                Modifier.fillMaxWidth().height(44.dp).glass(RoundedCornerShape(22.dp)).padding(horizontal = 16.dp),
++                Modifier.padding(horizontal = 16.dp),
+                 verticalAlignment = Alignment.CenterVertically,
+             ) {
+-                Icon(Icons.Rounded.Search, contentDescription = null, tint = ui.wp.accent, modifier = Modifier.size(22.dp))
++                Icon(Icons.Rounded.Search, contentDescription = null, tint = inkAccent(ui.wp.accent), modifier = Modifier.size(22.dp))
+                 Spacer(Modifier.width(10.dp))
+                 Text(
+                     if (query.isEmpty()) "Search your apps" else query,
+-                    color = Color.White.copy(alpha = if (query.isEmpty()) 0.65f else 1f),
++                    color = inkFg(Color.White.copy(alpha = if (query.isEmpty()) 0.65f else 1f)),
+                     fontSize = 16.sp,
+                     maxLines = 1,
+                     overflow = TextOverflow.Ellipsis,
+                 )
+             }
++            }
+             Spacer(Modifier.height(14.dp))
+             val rows = listOf("abcdefghi", "jklmnopqr", "stuvwxyz0", "123456789")
+             rows.forEachIndexed { ri, row ->
+@@ -374,8 +386,8 @@ fun SectionTitle(title: String, sub: String) {
+ @Composable
+ fun ActionCard(label: String, modifier: Modifier = Modifier, w: Dp = 240.dp, onClick: () -> Unit) {
+     OptionCard(selected = false, w = w, h = 52.dp, modifier = modifier, onClick = onClick) {
+-        Box(Modifier.fillMaxSize().glass(RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+-            Text(label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
++        GlassBox(Modifier.fillMaxSize(), RoundedCornerShape(16.dp), contentAlignment = Alignment.Center) {
++            Text(label, color = inkFg(), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+         }
+     }
+ }
+@@ -421,7 +433,7 @@ private fun GuideStep(n: Int, text: String) {
+             contentAlignment = Alignment.Center,
+         ) { Text("$n", color = ui.wp.dark, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+         Spacer(Modifier.width(12.dp))
+-        Text(text, color = Color.White, fontSize = 14.sp, lineHeight = 19.sp)
++        Text(text, color = inkFg(), fontSize = 14.sp, lineHeight = 19.sp)
+     }
+ }
+ 
+@@ -441,14 +453,24 @@ private fun ToggleCard(label: String, on: Boolean, modifier: Modifier, onClick:
+                     .clip(RoundedCornerShape(13.dp))
+                     .background(if (on) ui.wp.accent else Color.White.copy(alpha = 0.28f)),
+             ) {
+-                Box(
+-                    Modifier
+-                        .align(if (on) Alignment.CenterEnd else Alignment.CenterStart)
+-                        .padding(3.dp)
+-                        .size(20.dp)
+-                        .clip(CircleShape)
+-                        .background(if (on) ui.wp.dark else Color.White),
+-                )
++                if (ui.settings.glass == GlassStyle.Liquid && ui.backdrops?.liquid != null) {
++                    // In Liquid the thumb is a small glass capsule; its middle stays clear so the track shows through
++                    GlassBox(
++                        Modifier.align(if (on) Alignment.CenterEnd else Alignment.CenterStart).padding(2.dp).size(32.dp, 22.dp),
++                        RoundedCornerShape(11.dp),
++                        strict = false,
++                        overlayOnly = true,
++                    ) {}
++                } else {
++                    Box(
++                        Modifier
++                            .align(if (on) Alignment.CenterEnd else Alignment.CenterStart)
++                            .padding(3.dp)
++                            .size(20.dp)
++                            .clip(CircleShape)
++                            .background(if (on) ui.wp.dark else Color.White),
++                    )
++                }
+             }
+         }
+     }
+@@ -564,10 +586,10 @@ fun SettingsScreen(
+                     modifier = if (gi == 0) toRail else Modifier,
+                     onClick = { onChange(settings.copy(glass = g)) },
+                 ) {
+-                    Box(Modifier.fillMaxSize().glass(RoundedCornerShape(16.dp), style = g), contentAlignment = Alignment.Center) {
++                    GlassBox(Modifier.fillMaxSize(), RoundedCornerShape(16.dp), style = g, contentAlignment = Alignment.Center) {
+                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+-                            Text(g.label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+-                            Text(g.blurb, color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp)
++                            Text(g.label, color = inkFg(), fontSize = 14.sp, fontWeight = FontWeight.Medium)
++                            Text(g.blurb, color = inkFg(Color.White.copy(alpha = 0.8f)), fontSize = 10.sp)
+                         }
+                     }
+                 }
+@@ -587,8 +609,8 @@ fun SettingsScreen(
+                         modifier = if (si == 0) toRail else Modifier,
+                         onClick = { onChange(settings.copy(shape = s)) },
+                     ) {
+-                        Box(Modifier.align(Alignment.Center).size(46.dp).glass(s.toShape()), contentAlignment = Alignment.Center) {
+-                            Icon(Icons.Rounded.Apps, contentDescription = null, tint = ui.wp.accent, modifier = Modifier.size(24.dp))
++                        GlassBox(Modifier.align(Alignment.Center).size(46.dp), s.toShape(), strict = false, contentAlignment = Alignment.Center) {
++                            Icon(Icons.Rounded.Apps, contentDescription = null, tint = inkAccent(ui.wp.accent), modifier = Modifier.size(24.dp))
+                         }
+                     }
+                     Spacer(Modifier.height(6.dp))
+@@ -735,18 +757,20 @@ fun SettingsScreen(
+ 
+         // Home screen replacement guide
+         SectionTitle("Make Unwind your Home screen", "So the Home button on your remote opens Unwind")
+-        Column(Modifier.width(560.dp).glass(RoundedCornerShape(18.dp)).padding(horizontal = 18.dp, vertical = 14.dp)) {
++        GlassBox(Modifier.width(560.dp), RoundedCornerShape(18.dp)) {
++        Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
+             GuideStep(1, "Press the Home button on your remote.")
+             GuideStep(2, "If the TV asks which Home app to use, pick Unwind, then choose Always.")
+             GuideStep(3, "No question? Tap the button below and pick Unwind there.")
+             Spacer(Modifier.height(6.dp))
+             Text(
+                 "To switch back: pick your TV's original Home app in the same place, or uninstall Unwind.",
+-                color = Color.White.copy(alpha = 0.72f),
++                color = inkFg(Color.White.copy(alpha = 0.72f)),
+                 fontSize = 12.sp,
+                 lineHeight = 16.sp,
+             )
+         }
++        }
+         Spacer(Modifier.height(12.dp))
+         ActionCard("Open Home settings", toRail, 240.dp, onOpenHomeSettings)
+         Spacer(Modifier.height(24.dp))

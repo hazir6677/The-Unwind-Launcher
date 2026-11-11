@@ -59,7 +59,7 @@ fun scaleDown(src: Bitmap, w: Int, h: Int): Bitmap {
 }
 
 /** Pre-blurred copies of the wallpaper, already cropped to the screen's shape so glass lines up with it. */
-class Backdrops(val soft: Bitmap, val heavy: Bitmap, val clear: Bitmap)
+class Backdrops(val soft: Bitmap, val heavy: Bitmap, val liquid: LiquidData?)
 
 private fun blurPass(src: IntArray, dst: IntArray, w: Int, h: Int, r: Int, horizontal: Boolean) {
     val lines = if (horizontal) h else w
@@ -96,7 +96,11 @@ private fun cropToAspect(src: Bitmap, aspect: Float): Bitmap {
     }
 }
 
-fun makeBackdrops(src: Bitmap, aspect: Float): Backdrops {
+/**
+ * [scrimA] and [screenWidthPx] let the Liquid backdrop match what is really behind the glass: the wallpaper with the
+ * launcher's own scrims on top, softened by a small blur (see LG.BLUR_PX).
+ */
+fun makeBackdrops(src: Bitmap, aspect: Float, scrimA: Float, screenWidthPx: Int): Backdrops {
     val cropped = cropToAspect(src, aspect)
     fun blurred(w: Int, r: Int, passes: Int): Bitmap {
         val h = max(14, (w / aspect).roundToInt())
@@ -112,16 +116,23 @@ fun makeBackdrops(src: Bitmap, aspect: Float): Backdrops {
         out.setPixels(a, 0, w, 0, 0, w, h)
         return out
     }
+    // Liquid: about 960 wide (half of a 1080p screen) so the rim stays sharp, then scrims and a light blur
+    val lw = 960
+    val lh = max(14, (lw / aspect).roundToInt())
+    val lsmall = scaleDown(cropped, lw, lh)
+    val lpx = IntArray(lw * lh)
+    lsmall.getPixels(lpx, 0, lw, 0, 0, lw, lh)
+    for (i in lpx.indices) lpx[i] = lpx[i] or (0xFF shl 24)
     return Backdrops(
         soft = blurred(160, 2, 2),
         heavy = blurred(56, 2, 3),
-        clear = blurred(640, 2, 1), // sharper, so refraction is visible
+        liquid = buildLiquidData(lpx, lw, lh, scrimA, screenWidthPx),
     )
 }
 
 // ---------- Path helpers ----------
 
-private fun Outline.asPath(): Path {
+internal fun Outline.asPath(): Path {
     val o = this
     return Path().apply {
         when (o) {
@@ -132,7 +143,7 @@ private fun Outline.asPath(): Path {
     }
 }
 
-private fun insetPath(shape: Shape, size: Size, inset: Float, dir: LayoutDirection, d: Density): Path {
+internal fun insetPath(shape: Shape, size: Size, inset: Float, dir: LayoutDirection, d: Density): Path {
     val s = Size((size.width - 2f * inset).coerceAtLeast(2f), (size.height - 2f * inset).coerceAtLeast(2f))
     val p = shape.createOutline(s, dir, d).asPath()
     p.translate(Offset(inset, inset))
@@ -156,21 +167,13 @@ private fun backdropBrush(
     return ShaderBrush(shader)
 }
 
-// How strongly each lens band zooms, outer rim first. Below 1 pulls in outside content.
-private val LENS_Z = floatArrayOf(0.84f, 0.89f, 0.94f, 0.99f, 1.03f, 1.06f)
-
-private val SATURATE: ColorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.35f) })
-
 // ---------- The glass itself ----------
 
 /**
  * Draws a glass surface in one of three styles.
  *
- * Liquid: a lens. The middle is slightly magnified, the rim is drawn in six thin bands that pull in
- * the wallpaper from outside the shape (refraction), then specular edge light and a rainbow fringe.
- * On focus the lens swells and overshoots, like a drop of water.
- *
- * Normal / Frost: the wallpaper blurred behind a tint.
+ * Liquid: real refraction, baked per element (see LiquidCore.kt / LiquidGlass.kt).
+ * Normal / Frost: the wallpaper blurred behind a tint (unchanged).
  *
  * Everything is drawn as anti-aliased paths, so edges stay smooth even while scaling.
  * [idle] = false means: only draw while focused (used for small buttons).
@@ -182,6 +185,27 @@ fun Modifier.glass(
     style: GlassStyle? = null,
     blur: Boolean = true,
     idle: Boolean = true,
+    node: GlassNode? = null,
+    strict: Boolean = true,
+    overlayOnly: Boolean = false,
+): Modifier {
+    val ui = LocalUi.current
+    val st = style ?: ui.settings.glass
+    // Liquid has its own renderer (LiquidGlass.kt); Normal and Frost are untouched below.
+    return if (st == GlassStyle.Liquid && ui.backdrops?.liquid != null) {
+        liquidGlass(shape, focused, idle, node ?: remember { GlassNode() }, strict, overlayOnly)
+    } else {
+        classicGlass(shape, focused, style, blur, idle)
+    }
+}
+
+@Composable
+private fun Modifier.classicGlass(
+    shape: Shape,
+    focused: Boolean,
+    style: GlassStyle?,
+    blur: Boolean,
+    idle: Boolean,
 ): Modifier {
     val ui = LocalUi.current
     val st = style ?: ui.settings.glass
@@ -201,9 +225,6 @@ fun Modifier.glass(
             val h = size.height
             val dir = layoutDirection
             val path = shape.createOutline(size, dir, this).asPath()
-            // Liquid glass is drawn as six thin lens bands, outermost first, each a bit less "pulled in".
-            val bw = min(min(w, h) * 0.045f, 4.dp.toPx())
-            val bandPaths = if (st == GlassStyle.Liquid) Array(5) { insetPath(shape, size, bw * (it + 1), dir, this) } else emptyArray<Path>()
             val ring = insetPath(shape, size, 1.25.dp.toPx(), dir, this)
             val hair = 1.dp.toPx()
             val focusW = 2.5.dp.toPx()
@@ -216,7 +237,7 @@ fun Modifier.glass(
                 val cx = ox + w / 2f
                 val cy = oy + h / 2f
                 val bmp = when (st) {
-                    GlassStyle.Liquid -> backdrops?.clear
+                    GlassStyle.Liquid -> null
                     GlassStyle.Normal -> backdrops?.soft
                     GlassStyle.Frost -> backdrops?.heavy
                 }
@@ -226,36 +247,8 @@ fun Modifier.glass(
 
                 when (st) {
                     GlassStyle.Liquid -> {
-                        if (bm != null) {
-                            // outer bands pull in wallpaper from outside the shape (refraction),
-                            // inner bands settle to a slight magnification in the middle
-                            for (i in LENS_Z.indices) {
-                                val base = LENS_Z[i]
-                                val z = if (base < 1f) base - 0.04f * p else base + 0.06f * p
-                                val shape2 = if (i == 0) path else bandPaths[i - 1]
-                                drawPath(shape2, backdropBrush(bm, sx, sy, z, cx, cy, ox, oy), colorFilter = SATURATE)
-                            }
-                        } else {
-                            drawPath(path, Color.White.copy(alpha = 0.14f))
-                        }
-                        drawPath(path, Color.White.copy(alpha = 0.05f + 0.06f * min(p, 1f)))
-                        drawPath(path, tint.copy(alpha = 0.12f))
-                        drawPath(
-                            path,
-                            Brush.radialGradient(
-                                listOf(Color.White.copy(alpha = 0.34f), Color.Transparent),
-                                center = Offset(w * 0.25f, 0f),
-                                radius = max(w, h) * 0.85f,
-                            ),
-                        )
-                        drawPath(
-                            path,
-                            Brush.verticalGradient(
-                                0.7f to Color.Transparent,
-                                1f to Color.White.copy(alpha = 0.14f),
-                            ),
-                        )
-                        // No outline strokes here: the edge is defined by the lens bands alone.
+                        // Only seen for a moment before the wallpaper data is ready; liquidGlass() does the real work.
+                        drawPath(path, Color.White.copy(alpha = 0.10f + 0.06f * min(p, 1f)))
                     }
                     GlassStyle.Normal -> {
                         if (bm != null) drawPath(path, backdropBrush(bm, sx, sy, 1f, cx, cy, ox, oy))

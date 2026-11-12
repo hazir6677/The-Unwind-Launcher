@@ -5,7 +5,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.input.key.Key
@@ -77,7 +82,6 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.drawscope.drawOutline
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -353,8 +357,8 @@ fun Rail(
                 .drawBehind {
                     // same shape as the icons, so the highlight is a circle, squircle, rounded square or hexagon
                     val o = btnShape.createOutline(size, layoutDirection, this)
-                    drawOutline(o, ui.wp.accent)
-                    drawOutline(o, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.35f), Color.Transparent)))
+                    fillOutline(o, SolidColor(ui.wp.accent))
+                    fillOutline(o, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.35f), Color.Transparent)))
                 },
         )
         Column(
@@ -622,5 +626,17 @@ fun PopupLayer(popup: Popup, fromStart: Boolean = false, onDismiss: () -> Unit, 
                 .padding(top = if (fromStart) 104.dp else 72.dp, start = if (fromStart) 33.dp else 0.dp, end = if (fromStart) 0.dp else 24.dp)
                 .pointerInput(popup) { detectTapGestures { } },
         ) { content() }
+    }
+}
+
+/** Fills any shape outline (rect, rounded rect or generic path) with a brush. */
+fun DrawScope.fillOutline(outline: Outline, brush: Brush) {
+    when (outline) {
+        is Outline.Rectangle -> drawRect(brush, topLeft = outline.rect.topLeft, size = outline.rect.size)
+        is Outline.Rounded -> {
+            val r = outline.roundRect
+            drawRoundRect(brush, topLeft = Offset(r.left, r.top), size = Size(r.width, r.height), cornerRadius = r.topLeftCornerRadius)
+        }
+        is Outline.Generic -> drawPath(outline.path, brush)
     }
 }

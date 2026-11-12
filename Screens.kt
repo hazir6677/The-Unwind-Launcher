@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -100,8 +101,9 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
 
     val stacked = ui.settings.homeLayout == HomeLayout.Stacked
     val dock = ui.settings.dock
-    val dockShape = RoundedCornerShape(34.dp)
-    val dockPad = 18.dp
+    // The dock takes the icon shape: pill for circles, squarer for squircles/rounded, hexagonal for hexagons
+    val dockShape = ui.settings.shape.toBarShape()
+    val dockPad = if (ui.settings.shape == IconShape.Hexagon) 30.dp else 18.dp
     // the "Add apps" tile is the last item in the flow
     val items: List<AppEntry?> = favApps + null
 
@@ -129,6 +131,7 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
                 Box(
                     if (dock) Modifier.padding(end = 24.dp).offset(x = -dockPad).glass(dockShape) else Modifier,
                 ) {
+                    CompositionLocalProvider(LocalOnDock provides dock) {
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(gap),
                         // vertical padding leaves room for the focused tile to swell without being clipped
@@ -148,6 +151,7 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
                                 onAdd,
                             )
                         }
+                    }
                     }
                 }
             } else {
@@ -169,6 +173,7 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
                                 },
                                 horizontalArrangement = Arrangement.spacedBy(gap),
                             ) {
+                                CompositionLocalProvider(LocalOnDock provides (ri == 0 && dock)) {
                                 row.forEachIndexed { ci, app ->
                                     val isFirst = ri == 0 && ci == 0
                                     HomeTile(
@@ -178,6 +183,7 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
                                         onLaunch,
                                         onAdd,
                                     )
+                                }
                                 }
                             }
                         }
@@ -261,7 +267,6 @@ fun KeyCap(label: String, w: Dp, modifier: Modifier, active: Boolean = false, on
 
 @Composable
 fun SearchScreen(apps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (AppEntry) -> Unit) {
-    val ui = LocalUi.current
     var query by remember { mutableStateOf("") }
     LaunchedEffect(focusKick) {
         delay(200)
@@ -273,54 +278,33 @@ fun SearchScreen(apps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (AppE
         else apps.filter { it.label.lowercase().contains(q) }
             .sortedBy { if (it.label.lowercase().startsWith(q)) 0 else 1 }
     }
-    Row(Modifier.fillMaxSize().padding(start = 150.dp, top = 84.dp, end = 24.dp, bottom = 24.dp)) {
-        Column(Modifier.width(392.dp)) {
-            Row(
-                Modifier.fillMaxWidth().height(44.dp).glass(RoundedCornerShape(22.dp)).padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Rounded.Search, contentDescription = null, tint = ui.wp.accent, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    if (query.isEmpty()) "Search your apps" else query,
-                    color = Color.White.copy(alpha = if (query.isEmpty()) 0.65f else 1f),
-                    fontSize = 16.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(Modifier.height(14.dp))
-            val rows = listOf("abcdefghi", "jklmnopqr", "stuvwxyz0", "123456789")
-            rows.forEachIndexed { ri, row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    row.forEachIndexed { ci, ch ->
-                        var m: Modifier = Modifier
-                        if (ri == 0 && ci == 0) m = m.focusRequester(nav.content)
-                        m = m.dpad(left = if (ci == 0) nav.rail else null, up = if (ri == 0) nav.pill else null)
-                        KeyCap(ch.uppercase(), 38.dp, m) { query += ch }
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                KeyCap("Space", 126.dp, Modifier.dpad(left = nav.rail)) { query += " " }
-                KeyCap("Delete", 126.dp, Modifier) { query = query.dropLast(1) }
-                KeyCap("Clear", 126.dp, Modifier) { query = "" }
-            }
-        }
-        Spacer(Modifier.width(24.dp))
-        Box(Modifier.weight(1f).fillMaxSize()) {
+    Column(Modifier.fillMaxSize().padding(start = 150.dp, top = 84.dp, end = 24.dp)) {
+        // Android's own keyboard: press OK on the box to type, Search/Done or Back to come out
+        SystemTextField(
+            value = query,
+            onValueChange = { query = it },
+            hint = "Search your apps. Press OK to type.",
+            modifier = Modifier.width(520.dp).focusRequester(nav.content).dpad(left = nav.rail, up = nav.pill),
+        )
+        Spacer(Modifier.height(8.dp))
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val cols = maxOf(1, ((maxWidth + 12.dp) / (86.dp + 12.dp)).toInt())
             if (results.isEmpty()) {
                 Text("No apps match \"${query.trim()}\"", color = Color.White.copy(alpha = 0.8f), fontSize = 15.sp, modifier = Modifier.padding(top = 12.dp))
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(4),
+                    columns = GridCells.Fixed(cols),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
                 ) {
-                    itemsIndexed(results, key = { _, a -> a.pkg }) { _, app ->
-                        Tile(app.label, Modifier.dpad(up = nav.pill), onClick = { onLaunch(app) }, forceName = true) { d -> AppGlyph(app, d) }
+                    itemsIndexed(results, key = { _, a -> a.pkg }) { i, app ->
+                        Tile(
+                            app.label,
+                            Modifier.dpad(left = if (i % cols == 0) nav.rail else null),
+                            onClick = { onLaunch(app) },
+                            forceName = true,
+                        ) { d -> AppGlyph(app, d) }
                     }
                 }
             }

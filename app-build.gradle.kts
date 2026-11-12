@@ -17,7 +17,7 @@ android {
         targetSdk = 34
         // Goes up by one on every GitHub build, so Android always sees the new APK as an update
         versionCode = 100 + (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0)
-        versionName = "2.2"
+        versionName = "2.3"
     }
 
     signingConfigs {

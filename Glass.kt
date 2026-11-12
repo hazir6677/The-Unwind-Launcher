@@ -10,6 +10,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,6 +37,9 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+
+/** True for tiles sitting on the dock. They get a more solid body so they read against the dock glass. */
+val LocalOnDock = compositionLocalOf { false }
 
 /** One springy motion curve used everywhere, so the whole UI moves like one liquid. */
 val LiquidSpring = spring<Float>(dampingRatio = 0.68f, stiffness = 280f)
@@ -185,11 +189,13 @@ fun Modifier.glass(
 ): Modifier {
     val ui = LocalUi.current
     val st = style ?: ui.settings.glass
+    val onDock = LocalOnDock.current
     val lift = animateFloatAsState(if (focused) 1f else 0f, animationSpec = LiquidSpring, label = "glassLift")
     var pos by remember { mutableStateOf(IntOffset.Zero) }
     val tint = ui.wp.tint
     val screen = ui.size
     val backdrops = ui.backdrops
+    val dockBody = androidx.compose.ui.graphics.lerp(ui.wp.dark, tint, 0.35f).copy(alpha = 0.58f)
 
     return this
         .onGloballyPositioned {
@@ -238,6 +244,9 @@ fun Modifier.glass(
                         } else {
                             drawPath(path, Color.White.copy(alpha = 0.14f))
                         }
+                        // On the dock the lens would show the same wallpaper as the dock behind it, so the
+                        // icon gets a darker, more solid body to stand out from the bar
+                        if (onDock) drawPath(path, dockBody)
                         drawPath(path, Color.White.copy(alpha = 0.05f + 0.06f * min(p, 1f)))
                         drawPath(path, tint.copy(alpha = 0.12f))
                         drawPath(
@@ -268,6 +277,7 @@ fun Modifier.glass(
                                 ),
                             ),
                         )
+                        if (onDock) drawPath(path, ui.wp.dark.copy(alpha = 0.30f))
                         drawPath(
                             path,
                             Brush.verticalGradient(
@@ -285,6 +295,7 @@ fun Modifier.glass(
                         if (bm != null) drawPath(path, backdropBrush(bm, sx, sy, 1f, cx, cy, ox, oy))
                         drawPath(path, Color.White.copy(alpha = 0.22f + 0.12f * min(p, 1f)))
                         drawPath(path, tint.copy(alpha = 0.22f))
+                        if (onDock) drawPath(path, ui.wp.dark.copy(alpha = 0.24f))
                         drawPath(
                             path,
                             Brush.verticalGradient(

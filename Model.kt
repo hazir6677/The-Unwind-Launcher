@@ -75,7 +75,7 @@ val DEFAULT_GREETINGS: Map<DayPart, Greeting> = mapOf(
 enum class WallSource { Stock, Bing, Custom }
 
 enum class Screen { Home, Apps, Edit, Search, Settings, Gallery, Greeting }
-enum class Popup { None, Wifi, Inputs, Account }
+enum class Popup { None, Wifi, Inputs, Account, Weather }
 
 private val HexShape: Shape = GenericShape { size, _ ->
     val cx = size.width / 2f
@@ -88,6 +88,32 @@ private val HexShape: Shape = GenericShape { size, _ ->
         if (i == 0) moveTo(x, y) else lineTo(x, y)
     }
     close()
+}
+
+/**
+ * Bars and panels (the dock, the side rail, the top bar, the weather chip) take their ends from the
+ * chosen icon shape, so the whole UI speaks one shape language. The corner sizes are an icon's
+ * corner plus the padding around it, which makes the icon corners sit concentric inside the bar.
+ * The hexagon bar points left and right when it is wide, and up and down when it is tall.
+ */
+private val HexBarShape: Shape = GenericShape { size, _ ->
+    val w = size.width
+    val h = size.height
+    if (w >= h) {
+        val c = h * 0.32f
+        moveTo(0f, h / 2f); lineTo(c, 0f); lineTo(w - c, 0f); lineTo(w, h / 2f); lineTo(w - c, h); lineTo(c, h)
+    } else {
+        val c = w * 0.32f
+        moveTo(w / 2f, 0f); lineTo(w, c); lineTo(w, h - c); lineTo(w / 2f, h); lineTo(0f, h - c); lineTo(0f, c)
+    }
+    close()
+}
+
+fun IconShape.toBarShape(): Shape = when (this) {
+    IconShape.Circle -> RoundedCornerShape(percent = 50)
+    IconShape.Squircle -> RoundedCornerShape(percent = 40)
+    IconShape.Rounded -> RoundedCornerShape(percent = 26)
+    IconShape.Hexagon -> HexBarShape
 }
 
 fun IconShape.toShape(): Shape = when (this) {

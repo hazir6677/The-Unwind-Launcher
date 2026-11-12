@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -146,6 +147,13 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     val storageOk = remember(permTick) { hasPerm(ctx, storagePerm) }
     val isHome = remember(tick, homeTick) { isDefaultHome(ctx) }
     val popupFocus = remember { FocusRequester() }
+    val chipReq = remember { FocusRequester() }
+
+    // Weather: where the TV is (or the city you picked), refreshed every half hour
+    var wPrefs by remember { mutableStateOf(loadWeatherPrefs(prefs)) }
+    var weather by remember { mutableStateOf<WeatherData?>(null) }
+    var weatherErr by remember { mutableStateOf<String?>(null) }
+    var weatherTick by remember { mutableIntStateOf(0) }
 
     // Focus targets for moving around with the D-pad
     val railReqs = remember { List(4) { FocusRequester() } }
@@ -229,6 +237,14 @@ fun LauncherApp(tick: Int, homeTick: Int) {
         }
     }
     LaunchedEffect(permTick) { acct = withContext(Dispatchers.IO) { readAccount(ctx) } }
+    LaunchedEffect(wPrefs, locOk, weatherTick) {
+        while (true) {
+            val r = withContext(Dispatchers.IO) { runCatching { loadWeather(ctx, wPrefs) } }
+            r.onSuccess { weather = it; weatherErr = null }
+            r.onFailure { weatherErr = it.message ?: "Couldn't get the weather." }
+            delay(if (r.isSuccess) 30 * 60 * 1000L else 60 * 1000L)
+        }
+    }
     LaunchedEffect(popup, permTick) {
         when (popup) {
             Popup.Wifi -> {
@@ -242,6 +258,10 @@ fun LauncherApp(tick: Int, homeTick: Int) {
             }
             Popup.Account -> {
                 acct = withContext(Dispatchers.IO) { readAccount(ctx) }
+            }
+            Popup.Weather -> {
+                val w = weather
+                if (w == null || System.currentTimeMillis() - w.at > 10 * 60 * 1000L) weatherTick++
             }
             Popup.None -> {}
         }
@@ -432,6 +452,16 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                         style = TextStyle(shadow = Shadow(Color(0x66000000), blurRadius = 12f)),
                     )
                 }
+                // Small weather chip right under the page title
+                WeatherChip(
+                    data = weather,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 33.dp, top = 64.dp)
+                        .focusRequester(chipReq)
+                        .dpad(right = pillReq, down = railReqs[railSel]),
+                    onClick = { openPopup(Popup.Weather) },
+                )
                 TopPill(
                     acct = acct,
                     nav = nav,
@@ -455,12 +485,13 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                     },
                     reqs = railReqs,
                     toContent = contentReq,
+                    chip = chipReq,
                     modifier = Modifier.align(Alignment.CenterStart).padding(start = 33.dp, top = 24.dp),
                 )
             }
 
             if (popup != Popup.None) {
-                PopupLayer(popup, onDismiss = { closePopup() }) {
+                PopupLayer(popup, fromStart = popup == Popup.Weather, onDismiss = { closePopup() }) {
                     when (popup) {
                         Popup.Wifi -> WifiPopup(
                             state = wifi,
@@ -482,6 +513,16 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                             onGrant = { requestAccounts() },
                             onManage = { openAccountSettings(ctx) },
                         )
+                        Popup.Weather -> WeatherPopup(
+                            data = weather,
+                            error = weatherErr,
+                            prefs = wPrefs,
+                            locOk = locOk,
+                            focus = popupFocus,
+                            onPrefs = { wPrefs = it; saveWeatherPrefs(prefs, it) },
+                            onGrantLocation = { requestLocation() },
+                            onRefresh = { weatherTick++ },
+                        )
                         Popup.None -> {}
                     }
                 }
@@ -499,7 +540,8 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                 )
             }
 
-            AnimatedVisibility(visible = showIntro, enter = fadeIn(tween(400)), exit = fadeOut(tween(600))) {
+            // The intro animates itself in and out (see Intro.kt), so no wrapper fade here
+            if (showIntro) {
                 IntroScreen(
                     onDone = {
                         prefs.edit().putBoolean("introSeen", true).apply()

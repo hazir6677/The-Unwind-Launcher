@@ -328,9 +328,11 @@ fun Rail(
     onClick: (Int) -> Unit,
     reqs: List<FocusRequester>,
     toContent: FocusRequester,
+    chip: FocusRequester,
     modifier: Modifier,
 ) {
     val ui = LocalUi.current
+    val btnShape = ui.settings.shape.toShape()
     val icons = listOf(Icons.Rounded.Home, Icons.Rounded.Search, Icons.Rounded.Apps, Icons.Rounded.Tune)
     val btn = 54.dp
     val gap = 10.dp
@@ -341,19 +343,17 @@ fun Rail(
         animationSpec = spring(dampingRatio = 0.72f, stiffness = 240f),
         label = "railSlide",
     )
-    Box(modifier.width(71.dp).glass(RoundedCornerShape(36.dp))) {
+    Box(modifier.width(71.dp).glass(ui.settings.shape.toBarShape())) {
         Box(
             Modifier
                 .align(Alignment.TopCenter)
                 .offset { IntOffset(0, (padV.toPx() + slide * (btn + gap).toPx()).roundToInt()) }
                 .size(btn)
                 .drawBehind {
-                    val r = CornerRadius(22.dp.toPx())
-                    drawRoundRect(ui.wp.accent, cornerRadius = r)
-                    drawRoundRect(
-                        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.35f), Color.Transparent)),
-                        cornerRadius = r,
-                    )
+                    // same shape as the icons, so the highlight is a circle, squircle, rounded square or hexagon
+                    val o = btnShape.createOutline(size, layoutDirection, this)
+                    drawOutline(o, ui.wp.accent)
+                    drawOutline(o, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.35f), Color.Transparent)))
                 },
         )
         Column(
@@ -365,8 +365,8 @@ fun Rail(
                 FocusButton(
                     icon,
                     btn,
-                    RoundedCornerShape(22.dp),
-                    modifier = Modifier.focusRequester(reqs[i]).dpad(right = toContent),
+                    btnShape,
+                    modifier = Modifier.focusRequester(reqs[i]).dpad(right = toContent, up = if (i == 0) chip else null),
                     selected = selected == i,
                     filled = false,
                     onClick = { onClick(i) },
@@ -387,6 +387,8 @@ fun TopPill(
     onAccount: () -> Unit,
     modifier: Modifier,
 ) {
+    val ui = LocalUi.current
+    val btn = ui.settings.shape.toShape()
     val fmt = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
     var time by remember { mutableStateOf(fmt.format(Date())) }
     LaunchedEffect(Unit) {
@@ -397,16 +399,16 @@ fun TopPill(
     }
     val down = Modifier.dpad(down = nav.content)
     Row(
-        modifier.height(46.dp).glass(RoundedCornerShape(23.dp)).padding(horizontal = 8.dp),
+        modifier.height(46.dp).glass(ui.settings.shape.toBarShape()).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        FocusButton(Icons.Rounded.Search, 34.dp, CircleShape, modifier = Modifier.focusRequester(nav.pill).then(down), onClick = onSearch)
-        FocusButton(Icons.Rounded.Settings, 34.dp, CircleShape, modifier = down, onClick = onSystem)
-        FocusButton(Icons.Rounded.Wifi, 34.dp, CircleShape, modifier = down, onClick = onWifi)
-        FocusButton(Icons.Rounded.SettingsInputHdmi, 34.dp, CircleShape, modifier = down, onClick = onInputs)
+        FocusButton(Icons.Rounded.Search, 34.dp, btn, modifier = Modifier.focusRequester(nav.pill).then(down), onClick = onSearch)
+        FocusButton(Icons.Rounded.Settings, 34.dp, btn, modifier = down, onClick = onSystem)
+        FocusButton(Icons.Rounded.Wifi, 34.dp, btn, modifier = down, onClick = onWifi)
+        FocusButton(Icons.Rounded.SettingsInputHdmi, 34.dp, btn, modifier = down, onClick = onInputs)
         Text(time, color = Color.White, fontSize = 15.sp, modifier = Modifier.padding(horizontal = 6.dp))
-        FocusBox(34.dp, CircleShape, down, onClick = onAccount) {
+        FocusBox(34.dp, btn, down, onClick = onAccount) {
             Avatar(acct?.photo, acct?.emails?.firstOrNull()?.take(1)?.uppercase() ?: "", 28.dp)
         }
     }
@@ -415,8 +417,8 @@ fun TopPill(
 // ---------- Popups ----------
 
 @Composable
-fun PopupPanel(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.width(320.dp).glass(RoundedCornerShape(24.dp)).padding(16.dp)) {
+fun PopupPanel(title: String, width: Dp = 320.dp, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.width(width).glass(RoundedCornerShape(24.dp)).padding(16.dp)) {
         Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(10.dp))
         content()
@@ -611,12 +613,12 @@ fun AccountPopup(acct: AcctState?, accOk: Boolean, focus: FocusRequester, onGran
 
 /** Full-screen layer that holds the popup under the top pill. Tapping outside dismisses it. */
 @Composable
-fun PopupLayer(popup: Popup, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+fun PopupLayer(popup: Popup, fromStart: Boolean = false, onDismiss: () -> Unit, content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { onDismiss() } }) {
         Box(
             Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 72.dp, end = 24.dp)
+                .align(if (fromStart) Alignment.TopStart else Alignment.TopEnd)
+                .padding(top = if (fromStart) 104.dp else 72.dp, start = if (fromStart) 33.dp else 0.dp, end = if (fromStart) 0.dp else 24.dp)
                 .pointerInput(popup) { detectTapGestures { } },
         ) { content() }
     }

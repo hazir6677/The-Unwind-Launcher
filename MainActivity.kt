@@ -139,7 +139,8 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     var moveApp by remember { mutableStateOf<AppEntry?>(null) }
     val moveFocus = remember { FocusRequester() }
 
-    val wp = wall?.wp ?: WALLPAPERS[settings.wallpaper.coerceIn(0, WALLPAPERS.lastIndex)]
+    val baseWp = wall?.wp ?: WALLPAPERS[settings.wallpaper.coerceIn(0, WALLPAPERS.lastIndex)]
+    val wp = remember(baseWp, settings.colorTheme) { baseWp.withTheme(settings.colorTheme) }
     val storagePerm = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES
     else Manifest.permission.READ_EXTERNAL_STORAGE
     val locOk = remember(permTick) { hasPerm(ctx, Manifest.permission.ACCESS_FINE_LOCATION) }

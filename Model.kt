@@ -8,6 +8,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.cos
 import kotlin.math.sin
@@ -16,6 +17,13 @@ enum class GlassStyle(val label: String, val blurb: String) {
     Liquid("Liquid Glass", "Refraction, fluid motion"),
     Normal("Normal", "Tinted, soft blur"),
     Frost("Frost Glass", "Heavy blur, milky"),
+}
+
+/** Three palettes pulled from the same wallpaper, like Material You on Pixel. */
+enum class ColorTheme(val label: String, val blurb: String) {
+    Soft("Soft", "Lighter, pastel shades"),
+    Vivid("Vivid", "Brighter, punchier shades"),
+    Mixed("Mixed", "A balance of both"),
 }
 
 enum class IconShape(val label: String) {
@@ -131,7 +139,32 @@ class Wp(
     val tint: Color,
     val dark: Color,
     val luma: Float = 0.45f,
+    /** The un-themed tint, so every ColorTheme is always derived from the wallpaper itself and never stacks. */
+    val baseTint: Color? = null,
 )
+
+/**
+ * Re-colors the wallpaper palette for the chosen theme. Hue always comes from the wallpaper.
+ * Mixed is the original look, so existing installs don't change until you pick another one.
+ */
+fun Wp.withTheme(theme: ColorTheme): Wp {
+    val src = baseTint ?: tint
+    if (theme == ColorTheme.Mixed) return if (baseTint != null) this else Wp(key, name, accent, tint, dark, luma, src)
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(src.toArgb(), hsv)
+    val hue = hsv[0]
+    // tint saturation is roughly 0.12..0.57 (see deriveWp); recover a 0..1 "how colorful is it" value
+    val s = (hsv[1] / 0.95f).coerceIn(0.12f, 0.60f)
+    fun c(sat: Float, v: Float) =
+        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat.coerceIn(0f, 1f), v.coerceIn(0f, 1f))))
+    return when (theme) {
+        // lighter: low saturation, high value. Text on glass stays readable because tint/dark stay mid-dark.
+        ColorTheme.Soft -> Wp(key, name, c(s * 0.30f + 0.05f, 1.00f), c(s * 0.55f, 0.52f), c(s * 0.60f, 0.24f), luma, src)
+        // brighter: saturated accent, richer tint
+        ColorTheme.Vivid -> Wp(key, name, c((s * 0.9f + 0.35f), 1.00f), c((s * 1.35f + 0.20f), 0.52f), c((s * 1.2f + 0.25f), 0.20f), luma, src)
+        ColorTheme.Mixed -> this
+    }
+}
 
 val WALLPAPERS = listOf(
     Wp("wp_misty", "Misty Valley", Color(0xFFC5E1A5), Color(0xFF3E6B3C), Color(0xFF1E3322)),
@@ -148,6 +181,7 @@ data class LauncherSettings(
     val shape: IconShape = IconShape.Circle,
     val showNames: Boolean = true,
     val iconStyle: IconStyle = IconStyle.Themed,
+    val colorTheme: ColorTheme = ColorTheme.Mixed,
     val glass: GlassStyle = GlassStyle.Normal,
     val homeLayout: HomeLayout = HomeLayout.Endless,
     val dock: Boolean = false,
@@ -168,6 +202,7 @@ fun loadSettings(ctx: Context): LauncherSettings {
         shape = parseEnum(p.getString("shape", null), d.shape),
         showNames = p.getBoolean("showNames", d.showNames),
         iconStyle = parseEnum(p.getString("iconStyle", null), d.iconStyle),
+        colorTheme = parseEnum(p.getString("colorTheme", null), d.colorTheme),
         glass = parseEnum(p.getString("glass", null), d.glass),
         homeLayout = parseEnum(p.getString("homeLayout", null), d.homeLayout),
         dock = p.getBoolean("dock", d.dock),
@@ -188,6 +223,7 @@ fun saveSettings(ctx: Context, s: LauncherSettings) {
         .putString("shape", s.shape.name)
         .putBoolean("showNames", s.showNames)
         .putString("iconStyle", s.iconStyle.name)
+        .putString("colorTheme", s.colorTheme.name)
         .putString("glass", s.glass.name)
         .putString("homeLayout", s.homeLayout.name)
         .putBoolean("dock", s.dock)

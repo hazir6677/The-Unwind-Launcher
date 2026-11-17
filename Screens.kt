@@ -540,6 +540,31 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(24.dp))
 
+        // Color theme
+        SectionTitle("Color theme", "Three palettes pulled from your wallpaper")
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            ColorTheme.values().forEachIndexed { ci, t ->
+                val preview = remember(ui.wp.baseTint, ui.wp.key, t) { ui.wp.withTheme(t) }
+                OptionCard(
+                    selected = settings.colorTheme == t,
+                    w = 200.dp,
+                    h = 72.dp,
+                    modifier = if (ci == 0) toRail else Modifier,
+                    onClick = { onChange(settings.copy(colorTheme = t)) },
+                ) {
+                    Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ThemeSwatch(preview, Modifier.size(40.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(t.label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text(t.blurb, color = Color.White.copy(alpha = 0.75f), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
         // Glass style
         SectionTitle("Glass style", "How panels, the dock and tiles look")
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -821,6 +846,34 @@ fun GalleryScreen(
                     ) { onPick(item) }
                 }
             }
+        }
+    }
+}
+
+
+/** A round swatch split into three diagonal bands (tint, accent, dark), like the Pixel wallpaper & style picker. */
+@Composable
+fun ThemeSwatch(wp: Wp, modifier: Modifier = Modifier) {
+    androidx.compose.foundation.Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val circle = androidx.compose.ui.graphics.Path().apply { addOval(androidx.compose.ui.geometry.Rect(0f, 0f, w, h)) }
+        androidx.compose.ui.graphics.drawscope.clipPath(circle) {
+            drawRect(wp.accent)
+            // top-right band
+            drawPath(
+                androidx.compose.ui.graphics.Path().apply {
+                    moveTo(w * 0.45f, 0f); lineTo(w, 0f); lineTo(w, h * 0.55f); close()
+                },
+                androidx.compose.ui.graphics.lerp(wp.accent, Color.White, 0.35f),
+            )
+            // bottom-left band
+            drawPath(
+                androidx.compose.ui.graphics.Path().apply {
+                    moveTo(0f, h * 0.45f); lineTo(w * 0.55f, h); lineTo(0f, h); close()
+                },
+                wp.tint,
+            )
         }
     }
 }

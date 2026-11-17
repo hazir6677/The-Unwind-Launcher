@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -858,7 +859,7 @@ fun ThemeSwatch(wp: Wp, modifier: Modifier = Modifier) {
         val w = size.width
         val h = size.height
         val circle = androidx.compose.ui.graphics.Path().apply { addOval(androidx.compose.ui.geometry.Rect(0f, 0f, w, h)) }
-        androidx.compose.ui.graphics.drawscope.clipPath(circle) {
+        clipPath(circle) {
             drawRect(wp.accent)
             // top-right band
             drawPath(

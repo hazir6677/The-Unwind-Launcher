@@ -258,7 +258,68 @@ private fun adaptiveGlyph(d: AdaptiveIconDrawable): Glyph? {
     val s = inkStats(ink, size, size) ?: return null
     // a solid blob means the foreground has its own tile; let the color-based method handle those
     if (!isClean(s, 0.72f)) return null
-    return Glyph(buildMask(ink, size, size, s), Color.Transparent)
+    // Some apps (Play Store, Chrome...) ship a bare silhouette: a solid blob that tints to a flat shape.
+    // When the real logo is multicolored, keep its color regions as lighter and darker tones instead.
+    val tonal = if (isSolidBlob(ink, size)) d.foreground?.let { tonalInk(it, ink, size) } else null
+    return Glyph(buildMask(tonal ?: ink, size, size, s), Color.Transparent)
+}
+
+/** One run of ink per row on average means no holes or fine detail: a plain solid shape. */
+private fun isSolidBlob(ink: FloatArray, size: Int): Boolean {
+    var rows = 0
+    var runs = 0
+    for (y in 0 until size) {
+        var inside = false
+        var any = false
+        for (x in 0 until size) {
+            val on = ink[y * size + x] > 0.5f
+            if (on && !inside) runs++
+            inside = on
+            if (on) any = true
+        }
+        if (any) rows++
+    }
+    return rows > 0 && runs.toFloat() / rows <= 1.25f
+}
+
+/**
+ * Turns a multicolored foreground into an opacity map: brighter parts of the logo stay more opaque,
+ * darker parts fade back, so the accent tint still shows the logo's facets. Null if it isn't multicolored.
+ */
+private fun tonalInk(fg: Drawable, ink: FloatArray, size: Int): FloatArray? {
+    val bmp = fg.toBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val px = IntArray(size * size)
+    bmp.getPixels(px, 0, size, 0, 0, size, size)
+    val luma = FloatArray(px.size) { -1f }
+    val hue = IntArray(6)
+    val hsv = FloatArray(3)
+    var n = 0
+    var lo = 1f
+    var hi = 0f
+    for (i in px.indices) {
+        if (ink[i] < 0.9f) continue
+        val p = px[i]
+        val r = (p shr 16) and 255
+        val g = (p shr 8) and 255
+        val b = p and 255
+        val l = (0.299f * r + 0.587f * g + 0.114f * b) / 255f
+        luma[i] = l
+        if (l < lo) lo = l
+        if (l > hi) hi = l
+        android.graphics.Color.RGBToHSV(r, g, b, hsv)
+        if (hsv[1] > 0.35f && hsv[2] > 0.25f) hue[(hsv[0] / 60f).toInt().coerceIn(0, 5)]++
+        n++
+    }
+    if (n == 0) return null
+    val colors = hue.count { it > n * 0.08f }
+    if (colors < 3 || hi - lo < 0.12f) return null
+    val out = ink.copyOf()
+    for (i in out.indices) {
+        if (ink[i] <= 0f) continue
+        val t = if (luma[i] < 0f) 0.7f else ((luma[i] - lo) / (hi - lo)).coerceIn(0f, 1f)
+        out[i] = ink[i] * (0.42f + 0.58f * t)
+    }
+    return out
 }
 
 /**

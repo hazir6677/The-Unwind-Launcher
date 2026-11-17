@@ -372,6 +372,12 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                         Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = scrimA * 0.9f)),
                     ),
                 )
+                // Top scrim: the top bar, page hints and the first row of cards sit over bright sky on some wallpapers
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(0f to Color.Black.copy(alpha = scrimA * 0.6f), 0.38f to Color.Transparent),
+                    ),
+                )
 
                 when (screen) {
                     Screen.Home -> HomeContent(

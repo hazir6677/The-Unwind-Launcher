@@ -332,6 +332,8 @@ fun OptionCard(
             .size(w, h)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape)
+            // a dark, wallpaper-tinted body so cards never vanish on bright wallpapers
+            .background(ui.wp.dark.copy(alpha = if (selected || focused) 0.58f else 0.46f))
             .border(
                 if (focused) 3.dp else if (selected) 2.dp else 1.dp,
                 if (focused) Color.White else if (selected) ui.wp.accent else Color.White.copy(alpha = 0.25f),
@@ -350,8 +352,9 @@ fun OptionCard(
 @Composable
 fun SectionTitle(title: String, sub: String) {
     val ui = LocalUi.current
-    Text(title, color = ui.wp.accent, fontSize = 17.sp, fontWeight = FontWeight.Medium)
-    Text(sub, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+    val lift = TextStyle(shadow = Shadow(Color.Black.copy(alpha = 0.65f), Offset(0f, 2f), 8f))
+    Text(title, color = ui.wp.accent, fontSize = 17.sp, fontWeight = FontWeight.Medium, style = lift)
+    Text(sub, color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp, style = lift)
     Spacer(Modifier.height(10.dp))
 }
 

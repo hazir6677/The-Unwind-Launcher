@@ -135,7 +135,7 @@ fun loadWeatherPrefs(p: SharedPreferences): WeatherPrefs {
             null
         }
     }
-    val model = WeatherModel.values().firstOrNull { it.name == p.getString("w_model", null) } ?: WeatherModel.Best
+    val model = WeatherModel.Best // the source picker is gone; Open-Meteo chooses the best model per place
     return WeatherPrefs(
         auto = p.getBoolean("w_auto", true) || city == null,
         city = city,
@@ -225,8 +225,19 @@ private fun locateTv(ctx: Context): Located? {
     return Located(ip, "Internet address")
 }
 
+/** Open-Meteo's own geocoder first, then OpenStreetMap's (Nominatim) which knows towns and villages too. */
 fun searchCities(query: String): List<City> {
     val q = URLEncoder.encode(query.trim(), "UTF-8")
+    val first = runCatching { searchOpenMeteo(q) }
+    val got = first.getOrDefault(emptyList())
+    if (got.isNotEmpty()) return got
+    val second = runCatching { searchNominatim(q) }
+    if (second.isSuccess) return second.getOrThrow()
+    // both failed: this is a connection problem, not "no such city"
+    throw first.exceptionOrNull() ?: second.exceptionOrNull() ?: IOException("Search failed")
+}
+
+private fun searchOpenMeteo(q: String): List<City> {
     val j = JSONObject(httpGet("https://geocoding-api.open-meteo.com/v1/search?name=$q&count=8&language=en&format=json"))
     val arr = j.optJSONArray("results") ?: return emptyList()
     val out = ArrayList<City>()
@@ -235,6 +246,26 @@ fun searchCities(query: String): List<City> {
         out += City(o.optString("name"), o.optString("admin1"), o.optString("country"), o.getDouble("latitude"), o.getDouble("longitude"))
     }
     return out
+}
+
+private fun searchNominatim(q: String): List<City> {
+    val arr = org.json.JSONArray(
+        httpGet("https://nominatim.openstreetmap.org/search?q=$q&format=jsonv2&limit=8&addressdetails=1&accept-language=en"),
+    )
+    val out = ArrayList<City>()
+    for (i in 0 until arr.length()) {
+        val o = arr.getJSONObject(i)
+        val a = o.optJSONObject("address")
+        val name = a?.let {
+            it.optString("city").ifBlank { it.optString("town") }.ifBlank { it.optString("village") }
+                .ifBlank { it.optString("municipality") }.ifBlank { it.optString("suburb") }.ifBlank { it.optString("county") }
+        }.orEmpty().ifBlank { o.optString("name") }.ifBlank { o.optString("display_name").substringBefore(",") }
+        val lat = o.optString("lat").toDoubleOrNull() ?: continue
+        val lon = o.optString("lon").toDoubleOrNull() ?: continue
+        if (name.isBlank()) continue
+        out += City(name, a?.optString("state").orEmpty(), a?.optString("country").orEmpty(), lat, lon)
+    }
+    return out.distinctBy { it.label() + it.country }
 }
 
 private fun forecastUrl(c: City, model: WeatherModel, f: Boolean): String {
@@ -475,9 +506,9 @@ private fun DayColumn(d: WeatherDay, modifier: Modifier) {
     val ui = LocalUi.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(d.label, color = Color.White.copy(alpha = 0.78f), fontSize = 12.sp)
-        Spacer(Modifier.height(4.dp))
-        WeatherGlyph(d.code, true, 30.dp)
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
+        WeatherGlyph(d.code, true, 26.dp)
+        Spacer(Modifier.height(2.dp))
         Text("${d.hi}\u00B0", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         Text("${d.lo}\u00B0", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
         Text(
@@ -531,30 +562,25 @@ fun WeatherPopup(
         searching = false
     }
 
-    PopupPanel(if (picking) "Choose a city" else "Weather", 400.dp) {
+    PopupPanel(if (picking) "Choose a city" else "Weather", 330.dp) {
         if (!picking) {
             if (data != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    WeatherGlyph(data.now.code, data.now.isDay, 64.dp)
-                    Spacer(Modifier.width(14.dp))
+                    WeatherGlyph(data.now.code, data.now.isDay, 46.dp)
+                    Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("${data.now.temp}\u00B0", color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.Medium)
-                        Text(describeWeather(data.now.code), color = ui.wp.accent, fontSize = 14.sp)
+                        Text("${data.now.temp}\u00B0", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Medium)
+                        Text(describeWeather(data.now.code), color = ui.wp.accent, fontSize = 12.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(data.city.label(), color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val unit = if (data.fahrenheit) "mph" else "km/h"
+                        Text("Feels ${data.now.feels}\u00B0", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+                        Text("${data.now.humidity}%  \u00B7  ${data.now.wind} $unit", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
                     }
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(data.city.full(), color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                val unit = if (data.fahrenheit) "mph" else "km/h"
-                Text(
-                    "Feels like ${data.now.feels}\u00B0  \u00B7  Humidity ${data.now.humidity}%  \u00B7  Wind ${data.now.wind} $unit",
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 12.sp,
-                )
-                if (data.note.isNotBlank()) {
-                    Text(data.note, color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     data.days.forEach { d -> DayColumn(d, Modifier.weight(1f)) }
                 }
             } else {
@@ -564,23 +590,13 @@ fun WeatherPopup(
                     fontSize = 13.sp,
                 )
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
             PopupRow(
                 "Change city",
-                subtitle = if (prefs.auto) "Now: detected automatically" + (data?.let { " (${it.how.lowercase()})" } ?: "") else "Now: ${data?.city?.label() ?: prefs.city?.label() ?: ""}",
+                subtitle = if (prefs.auto) "Detected automatically" else (prefs.city?.label() ?: ""),
                 icon = Icons.Rounded.LocationOn,
                 modifier = Modifier.focusRequester(focus),
                 onClick = { picking = true },
-            )
-            Spacer(Modifier.height(4.dp))
-            PopupRow(
-                "Weather source",
-                subtitle = "${prefs.model.label}: ${prefs.model.blurb}",
-                icon = Icons.Rounded.Cloud,
-                onClick = {
-                    val all = WeatherModel.values()
-                    onPrefs(prefs.copy(model = all[(prefs.model.ordinal + 1) % all.size]))
-                },
             )
             Spacer(Modifier.height(4.dp))
             PopupRow(
@@ -593,13 +609,11 @@ fun WeatherPopup(
                 Spacer(Modifier.height(4.dp))
                 PopupRow(
                     "Use the TV's location",
-                    subtitle = "More precise than the internet address. Needs permission.",
+                    subtitle = "More precise. Needs permission.",
                     icon = Icons.Rounded.LocationOn,
                     onClick = onGrantLocation,
                 )
             }
-            Spacer(Modifier.height(4.dp))
-            PopupRow("Refresh", icon = Icons.Rounded.Refresh, onClick = onRefresh)
         } else {
             SystemTextField(
                 value = query,
@@ -616,7 +630,7 @@ fun WeatherPopup(
             }
             if (results.isNotEmpty()) {
                 Column(
-                    Modifier.heightIn(max = 190.dp).verticalScroll(rememberScrollState()),
+                    Modifier.heightIn(max = 150.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     results.forEach { c ->

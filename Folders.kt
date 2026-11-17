@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -171,8 +172,11 @@ fun AppFolders(
         } else {
             Text(
                 "${current.first}  \u00B7  hold OK on an app to move it to another folder. Back returns to the folders.",
-                color = Color.White.copy(alpha = 0.82f),
+                color = Color.White.copy(alpha = 0.9f),
                 fontSize = 14.sp,
+                style = androidx.compose.ui.text.TextStyle(
+                    shadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = 0.65f), Offset(0f, 2f), 8f),
+                ),
             )
             Spacer(Modifier.height(12.dp))
             val columns = 7

@@ -2,10 +2,6 @@ Unwind Launcher
 
 A custom home screen for Android TV. Frosted glass panels sit on top of your wallpaper, and the icons, glass, weather chip and highlights all take their colors from whatever picture you pick.
 
-<p align="center">
-<img src="Tinted homescreen with weather.jpg" alt="Unwind home screen with tinted glass, pinned apps and live weather chip" width="100%">
-</p>
-
 I run it on a 55-inch Xiaomi TV, so that's where most of the testing happened.
 
 What's new in v2.2
@@ -27,24 +23,6 @@ System keyboard search and smarter icon tinting: App search and weather city loo
 Welcome screen and smoother release builds: A short animated intro runs the first time Unwind opens (and can be replayed from Preferences). GitHub Actions now builds a minified app-release.apk alongside app-debug.apk, with ProfileInstaller pre-compiling Compose code on first run to remove start-up stutter.
 
 Screenshots
-
-v2.2 highlights
-
-<p align="center">
-<img src="Tinted homescreen with weather.jpg" alt="Tinted home screen with weather chip and evening greeting" width="100%">
-</p>
-<p align="center"><em>Tinted home screen with the live weather chip, custom evening greeting and themed icons</em></p>
-
-<table>
-<tr>
-<td><img src="App folders in the app drawer.jpg" alt="App folders in the app drawer"></td>
-<td><img src="Launcher prefernces page with color theme styles.jpg" alt="Preferences page with wallpaper and color theme styles"></td>
-</tr>
-<tr>
-<td align="center">App folders in the app drawer (press OK to open, hold OK on an app to move it)</td>
-<td align="center">Preferences page with Daily wallpaper, Soft / Vivid / Mixed color themes and glass styles</td>
-</tr>
-</table>
 
 Glass styles across wallpapers
 

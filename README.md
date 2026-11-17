@@ -1,194 +1,176 @@
-Unwind Launcher
+# Unwind Launcher
 
-A custom home screen for Android TV. Frosted glass panels sit on top of your wallpaper, and the icons, glass, weather chip and highlights all take their colors from whatever picture you pick.
+### A calmer home for your Android TV.
 
-I run it on a 55-inch Xiaomi TV, so that's where most of the testing happened.
+Unwind turns your TV home screen into a wallpaper-driven experience. Frosted glass, adaptive colours, thoughtfully styled icons and smooth animations come together in a clean interface designed for the big screen.
 
-What's new in v2.2
+Pick a wallpaper. Unwind takes care of the rest.
 
-Live weather and 5-day forecast: A small weather chip sits right under the page title in the top-left corner with custom-drawn sky icons tinted to your wallpaper. Press OK on it to see current conditions, feels-like temperature, humidity, wind speed and a 5-day outlook (with rain probability) powered by Open-Meteo. It detects your city automatically from the TV's location or IP address, or lets you search for any city, town or village and switch between Celsius (°C, km/h) and Fahrenheit (°F, mph).
+Built and primarily tested on a 55-inch Xiaomi TV.
 
-Wallpaper color themes (Soft, Vivid, Mixed): Pulls three distinct palettes from the same wallpaper, similar to Material You on Pixel. Pick Soft for lighter pastel shades, Vivid for brighter punchier accents, or Mixed for a balanced middle ground.
+## ✨ Highlights
 
-App folders in the app drawer: Switch the All apps page from the A–Z grid to Folders (Video, Music, Games, Social, News, Photos, Productivity and Other), sorted automatically like the iOS App Library. Hold OK on any app inside a folder to move it to another folder or reset it to automatic sorting.
+- **Three glass styles:** Liquid Glass, Normal and Frost Glass, each with its own look and feel.
+- **Wallpaper-aware theming:** Colours, accents and app icons adapt to your wallpaper. Choose Soft, Vivid or Mixed palettes.
+- **Live weather:** Current conditions and a five-day forecast, with automatic location detection and manual city search.
+- **Smarter app drawer:** Browse apps alphabetically or use automatically sorted folders, including apps most TV launchers hide.
+- **Flexible home layouts:** Choose a single scrolling row or stacked rows, with an optional adjustable glass dock.
+- **Custom greetings:** Personalise your Home screen greeting for morning, afternoon, evening and night.
+- **TV-friendly navigation:** D-pad focus, spring animations and native on-screen keyboard support.
 
-Home layouts and adjustable glass dock: Keep your pinned apps in one Endless row that scrolls sideways, or switch to Stacked rows that fill the screen width and wrap below. You can also place a glass dock bar behind the first row in your active glass style and set its height (Default, Lower or Lowest).
+## Screenshots
 
-Editable greetings for every part of the day: Rewrite the three-line greeting on Home (Small line, Headline and Highlighted line) separately for Morning, Afternoon, Evening and Night using the built-in editor and live preview.
+### Glass styles across wallpapers
 
-Unified shape language and sliding rail highlight: The left dock, top-right pill, home dock, search box and weather chip now take their outer corners from your chosen icon shape (Circle, Squircle, Rounded or Hexagon), and the active page highlight in the left dock slides smoothly with a spring motion.
+The same interface, adapting to different wallpapers and glass styles.
 
-System keyboard search and smarter icon tinting: App search and weather city lookup now use Android TV's built-in on-screen keyboard (Gboard or system IME) without trapping D-pad focus. Themed icon extraction also keeps tonal shading on multicolored logos and reaches inside inner tile backgrounds.
+| Liquid Glass | Normal Glass |
+|---|---|
+| <img src="shot_home_liquid_green.png" alt="Liquid Glass with green wallpaper"> | <img src="shot_home_normal_green.png" alt="Normal Glass with green wallpaper"> |
+| Misty Valley | Misty Valley |
 
-Welcome screen and smoother release builds: A short animated intro runs the first time Unwind opens (and can be replayed from Preferences). GitHub Actions now builds a minified app-release.apk alongside app-debug.apk, with ProfileInstaller pre-compiling Compose code on first run to remove start-up stutter.
+| Liquid Glass | Preferences |
+|---|---|
+| <img src="shot_home_liquid_amber.png" alt="Liquid Glass with amber wallpaper"> | <img src="shot_preferences.png" alt="Preferences overview"> |
+| Golden Hour | Settings overview |
 
-Screenshots
+## The experience
 
-Glass styles across wallpapers
+### Glass that feels like glass
 
-Same home screen, two wallpapers, two glass styles. The colors change on their own when the wallpaper does.
+Choose between three visual styles:
 
-<table>
-<tr>
-<td><img src="shot_home_liquid_green.png" alt="Liquid Glass, green wallpaper"></td>
-<td><img src="shot_home_normal_green.png" alt="Normal glass, green wallpaper"></td>
-</tr>
-<tr>
-<td align="center">Liquid Glass, Misty Valley wallpaper</td>
-<td align="center">Normal glass, Misty Valley wallpaper</td>
-</tr>
-<tr>
-<td><img src="shot_home_liquid_amber.png" alt="Liquid Glass, amber wallpaper"></td>
-<td><img src="shot_preferences.png" alt="Preferences screen overview"></td>
-</tr>
-<tr>
-<td align="center">Liquid Glass, amber sunrise wallpaper</td>
-<td align="center">Preferences overview</td>
-</tr>
-</table>
+- **Liquid Glass:** Distorts the wallpaper around its edges, with subtle lighting, colour fringing and springy focus animations.
+- **Normal:** A softly blurred, tinted glass panel.
+- **Frost Glass:** A heavier, milkier blur.
 
-What you get
+### Colours that follow your wallpaper
 
-There are three glass styles: Liquid Glass, Normal and Frost Glass. Normal is a tinted, softly blurred panel. Frost Glass is a heavier, milkier blur. Liquid Glass is the fancy one. It bends the wallpaper at the edges the way a real piece of glass would, adds a bit of edge light and a rainbow fringe, and swells with a springy motion when you focus on it.
+Use one of six built-in nature wallpapers, the Bing daily wallpaper or your own photo. Unwind extracts a colour palette and builds three variations:
 
-For wallpapers you can use one of the six that come with it (Misty Valley, Emerald Lake, Golden Hour, Morning Fog, Dusk, Night Canopy), the Bing daily wallpaper, or your own picture from the TV or a USB drive. From there, you can switch the palette between Soft, Vivid and Mixed so the tint and accent are as subtle or punchy as you want.
+- **Soft** for lighter, pastel tones.
+- **Vivid** for brighter accents.
+- **Mixed** for a balance between the two.
 
-App icons get recolored to match the wallpaper. The logo is pulled off its background at high resolution and tinted. Multicolored foreground logos keep their lighter and darker facets so they don't flatten into a plain blob, and if an icon can't be separated cleanly, it shows up as a two-tone chip so it still fits in. You can switch to Original if you'd rather have the full-color icons. Icon shapes are Circle, Squircle, Rounded and Hexagon, and all the bars and panels reshape their ends to match.
+App icons can be tinted to match the palette or left in their original colours. Choose from Circle, Squircle, Rounded and Hexagon shapes.
 
-The top-left corner always tells you where you are (Home, Search, Apps, Favorites or Preferences), with the live weather chip tucked right underneath.
+### Your apps, your way
 
-Day to day:
+The Home screen holds your pinned apps, while the app drawer offers two ways to browse:
 
-Home has your pinned apps plus an Add apps tile at the end for choosing them.
+- **All apps:** A familiar alphabetical grid.
+- **Folders:** Automatic categories for Video, Music, Games, Social, News, Photos, Productivity and Other.
 
-All apps includes sideloaded phone apps like Google Photos, which most TV launchers hide. Switch between a single A–Z grid or automatic Folders (Video, Music, Games, Social, News, Photos, Productivity, Other), and hold OK on an app inside a folder to move it somewhere else.
+Sideloaded phone apps appear alongside Android TV apps. Hold OK on an app in a folder to move it or restore automatic sorting.
 
-Search uses your TV's native on-screen keyboard to filter installed apps as you type, without locking up remote navigation.
+### Made for the remote
 
-Weather sits under the page title and opens a 5-day forecast popup with automatic location detection, manual city search and Celsius/Fahrenheit switching.
+Navigate between the left dock, weather, top bar and app grid using the D-pad. Search uses your TV's native on-screen keyboard, so typing doesn't interrupt remote navigation.
 
-Top bar has a search shortcut, Android system settings, a live list of nearby Wi-Fi networks (with signal strength and 2.4 / 5 / 6 GHz band), TV inputs (HDMI, tuner, AV), the clock and your signed-in Google account.
+The top bar also gives you quick access to Android settings, nearby Wi-Fi networks and signal strength, TV inputs, the clock and your signed-in Google account.
 
-D-pad navigation moves cleanly between the left dock, the weather chip, the top bar and your apps in every direction.
+## Download and install
 
-Home layout is your call: one endless row that scrolls sideways, or stacked rows that fill the screen width and wrap below. Either way you can turn on a glass dock behind the first row and set how low it sits on the screen.
+1. Open the [Releases page](../../releases) and download the latest APK.
+2. Sideload it onto your Android TV.
+3. Install `app-release.apk` when available. It is minified and includes release optimisations.
+   
+### Make Unwind your default Home screen
 
-Greetings on Home (the "Good evening / Time to unwind" bit) can be rewritten for morning, afternoon, evening and night from Preferences.
+Press the Home button on your remote. When prompted, select Unwind and choose **Always**.
 
-Welcome screen plays a short animated intro the first time Unwind opens, and you can replay it any time from the bottom of Preferences.
+If your TV doesn't show the prompt, open Preferences in Unwind and select **Open Home settings**.
 
-Getting the APK
+Some TVs, including certain Xiaomi models, restrict the Home button to their built-in launcher. You can still use Unwind as a regular app, or set it as Home through ADB:
 
-Download the latest APK from the Releases page (or grab the build artifact from GitHub Actions) and sideload it onto your TV.
+1. On your TV, open **Settings → Device Preferences → About** and press Build seven times to enable Developer options.
+2. Enable Network debugging or USB debugging.
+3. Connect from a computer:
 
-Both app-release.apk and app-debug.apk are built automatically. Install app-release.apk when available—it's minified and noticeably smoother on TV hardware.
+```bash
+adb connect <TV-IP-address>
+```
 
-The APK is signed with a fixed key that lives in this repo's GitHub Secrets (never in the code), so each new build installs right over the old one and keeps your settings. It's a personal sideload key, so it won't go on the Play Store as is.
+4. Set Unwind as the Home activity:
 
-Making it your Home screen
+```bash
+adb shell cmd package set-home-activity com.unwind.launcher/.MainActivity
+```
 
-Press the Home button on your remote. If the TV asks which Home app to use, pick Unwind and choose Always.
+To revert, uninstall Unwind:
 
-If it doesn't ask, open Preferences in Unwind, scroll to the bottom and tap Open Home settings, then pick Unwind from there.
+```bash
+adb uninstall com.unwind.launcher
+```
 
-To go back, pick your TV's original Home app in the same place, or just uninstall Unwind.
+The APK is signed with a dedicated key stored in GitHub Secrets, not in the source code. This allows new builds to install over existing versions while retaining settings. It is a personal sideload key and is not suitable for Play Store distribution.
 
-Some TVs lock the Home button to their built-in screen. Xiaomi does this on some models. If yours does, Unwind still works as a regular app, and you can force it with ADB:
+## Preferences
 
-On the TV, go to Settings > Device Preferences > About and press Build seven times to unlock Developer options. Then turn on Network debugging (or USB debugging).
+Make the launcher yours:
 
-On a computer with ADB, connect: adb connect <TV-IP-address>
+| Setting | Options |
+|---|---|
+| Wallpaper | Bing daily, My photo, six built-in wallpapers |
+| Colour palette | Soft, Vivid, Mixed |
+| Glass style | Liquid Glass, Normal, Frost Glass |
+| Icon shape | Circle, Squircle, Rounded, Hexagon |
+| Icon colours | Themed or Original |
+| Home layout | Endless row or Stacked rows |
+| Glass dock | On or Off, with adjustable height |
+| App drawer | Alphabetical grid or Folders |
+| App names | Show or hide on Home |
+| Greetings | Custom text for each part of the day |
 
-Run: adb shell cmd package set-home-activity com.unwind.launcher/.MainActivity
+Custom wallpapers are copied into the launcher and scaled to your TV's resolution, so they remain available even after the original file or USB drive is removed.
 
-To undo it, uninstall Unwind: adb uninstall com.unwind.launcher
+## Permissions and privacy
 
-Finding your way around
+Unwind requests only the permissions needed for its features:
 
-The dock on the left has four buttons: house for Home, magnifier for Search, grid for All apps, and sliders for Preferences. A spring-animated highlight slides to whichever screen you're on.
+- **Internet:** Bing wallpapers, Open-Meteo weather forecasts and city lookup.
+- **Location and Wi-Fi state:** Local weather detection and nearby Wi-Fi scanning. Android requires location access to list nearby networks.
+- **Pictures and storage:** Access to images when selecting a custom wallpaper.
+- **Accounts and contacts:** Displaying your signed-in Google account and avatar.
 
-Right above the dock sits the page title and the Weather chip. Press OK on the weather chip to open the 5-day forecast, switch between °C and °F, or change your city.
+Weather can use your TV's last known location or an IP-based location fallback. Location and personal data are not stored externally or tracked by Unwind.
 
-The pill in the top right has the search shortcut, a gear for Android system settings, Wi-Fi (the connected network is highlighted), an HDMI icon for switching TV inputs, the clock, and an avatar showing which Google account is signed in.
+Daily wallpapers and weather require an internet connection. They refresh when the launcher opens and every 30 minutes while it is running.
 
-Preferences
+## Under the hood
 
-Wallpaper: Daily wallpaper (Bing image of the day), My photo, or one of the six built-in nature wallpapers
+Unwind is built with Kotlin and Jetpack Compose, with custom rendering and navigation designed specifically for Android TV.
 
-Color theme: Soft (lighter, pastel shades), Vivid (brighter, punchier shades), or Mixed (a balance of both)
+A few things that make it work:
 
-Glass style: Liquid Glass, Normal, Frost Glass
+- **Glass rendering:** Pre-blurred wallpaper layers power Normal and Frost Glass. Liquid Glass uses six lens bands to simulate edge distortion and subtle central magnification.
+- **Adaptive icons:** Extracts monochrome or adaptive icon layers where available, preserving tonal detail in multicoloured logos. Older icons use background and luminance analysis.
+- **Dynamic colours:** Samples the wallpaper on a 48 × 27 grid, weighting saturation and brightness to generate its colour palettes.
+- **Weather graphics:** Custom-drawn Compose Canvas icons, powered by Open-Meteo. No API key or account required.
+- **App discovery:** Queries both Android TV and standard Android launcher activities, making sideloaded phone apps discoverable too.
 
-Icon shape: Circle, Squircle, Rounded, Hexagon
+### Tech stack
 
-Icon style: Themed (tinted to your wallpaper) or Original (full-color app icons)
+Kotlin 1.9.24 · Jetpack Compose · Material 3 · AndroidX ProfileInstaller 1.3.1 · Gradle 8.7 · Android Gradle Plugin 8.5.2 · JDK 17
 
-Home layout: Endless row (scrolls sideways) or Stacked rows (wraps into rows below)
+`minSdk 24` · `targetSdk 34`
 
-Dock: Dock on or Dock off (places a glass bar behind the first row)
+No `androidx.tv` dependency. D-pad focus handling and spring animations are implemented directly with Compose primitives.
 
-Dock height: Default, Lower, Lowest
+## Known limitations
 
-All apps page: All apps (A to Z grid) or Folders (sorted by app type; hold OK on an app to move it)
+- Some TV manufacturers restrict replacing their built-in Home screen. ADB can help work around this.
+- A few unusual app icons cannot be cleanly separated from their backgrounds and may appear as two-tone tiles.
+- Input switching depends on the TV manufacturer's `TvInputManager` implementation.
+- Some sideloaded phone apps are designed for touch and may be awkward to navigate with a remote.
 
-App names: Names on or Names off on Home
+## On the roadmap
 
-Greetings: Customize the 3-line greeting for Morning (5 AM–12 PM), Afternoon (12 PM–5 PM), Evening (5 PM–9 PM) and Night (9 PM–5 AM)
+- Reordering pinned apps.
+- Creating and renaming custom folders.
+- More glass and icon styles.
+- Additional top bar layouts.
 
-Make Unwind your Home screen: Quick setup steps and a shortcut to Open Home settings
+## License
 
-Welcome screen: Replay welcome screen button
-
-For your own picture, choose My photo, then pick from the list of pictures on the TV or USB drive (or tap Browse files...). The picture gets copied into the launcher and scaled to TV resolution (handling EXIF rotation automatically), so it stays even if you unplug the USB drive or delete the original. Tap My photo again any time to pick a different one.
-
-Daily wallpaper and Weather both need internet. They check when the launcher opens and refresh every half hour while it's up.
-
-Permissions
-
-Internet: to download the Bing daily wallpaper and fetch weather forecasts from Open-Meteo (plus city search via Open-Meteo and OpenStreetMap Nominatim, and IP fallback location when GPS/network location isn't granted).
-
-Location and Wi-Fi state: Android won't let an app list nearby Wi-Fi networks without location access. If granted, Unwind also uses the TV's last known location for local weather. Nothing is stored externally or tracked.
-
-Pictures and storage: only to show your pictures when you pick a custom wallpaper. It asks the first time you open the picture picker.
-
-Accounts and contacts: only to show which Google account is signed in and its profile avatar in the top bar.
-
-How it works
-
-Glass. Each wallpaper is blurred ahead of time at three strengths (soft, heavy and clear) and cropped to the screen's aspect ratio so the backdrop lines up with the wallpaper behind it. Normal and Frost just draw the matching blurred slice behind a tint. Liquid Glass stacks six thin lens bands (LENS_Z from 0.84x at the outer rim to 1.06x in the center). The outer rim pulls in wallpaper from outside the shape, which is what the edge of a real piece of glass does. Each band further in does a little less of that, and the center magnifies slightly. Everything is drawn as anti-aliased paths, so edges stay smooth as tiles scale.
-
-Icons. Modern Android icons come in layers, and Unwind checks the Android 13+ monochrome layer or adaptive foreground layer first. If an adaptive foreground is a flat silhouette whose original artwork is multicolored, Unwind maps its color luminance into tonal opacity so the tinted glyph keeps its internal detail. Older icons are separated from their background by border color and luminance—even looking inside an inner tile if the logo sits inside a box—and shrunk in halves (scaleDown) so edges stay crisp on a big screen.
-
-Colors. The wallpaper is sampled on a 48×27 grid weighted by saturation and brightness to find its dominant hue. From that base hue, Unwind builds the Mixed, Soft and Vivid palettes and adjusts the dark background scrims based on the wallpaper's overall luminance so text always stays readable.
-
-Weather. Forecasts come from Open-Meteo, which needs no API key or account. All weather icons (sun, moon, clouds, fog, rain, snow, lightning) are drawn directly on a Compose Canvas using the wallpaper's accent color, so no external icon font is needed.
-
-Apps. Queries both CATEGORY_LEANBACK_LAUNCHER and standard CATEGORY_LAUNCHER activities, which is why sideloaded phone apps show up alongside native TV apps. Folder view checks ApplicationInfo.category first and falls back to package-name matching for TV apps that don't declare a category.
-
-Tech
-
-Kotlin 1.9.24 and Jetpack Compose (BOM 2024.06.00), Material 3 with extended icons, AndroidX ProfileInstaller 1.3.1, Android Gradle Plugin 8.5.2, Gradle 8.7, JDK 17. minSdk 24, targetSdk 34. Zero androidx.tv dependency—all D-pad focus routing and spring animations are built directly on plain Compose primitives.
-
-Known problems
-
-Some TVs, including some Xiaomi models, lock the Home button to their own home screen. Unwind still works as an app there, or you can set it via the ADB command above.
-
-A few unusual icons can't be separated from their background, so they show as two-tone chips.
-
-Switching inputs goes through the TV's own Live TV / input framework (TvInputManager), so how well it works depends on the brand.
-
-Sideloaded phone apps are built for touch, and some are hard to use with a remote.
-
-Maybe later
-
-Reordering pinned apps on Home
-
-Custom folder creation and renaming
-
-More glass and icon styles
-
-Top bar layout options
-
-License
-
-MIT. See LICENSE.
+Released under the [MIT License](LICENSE).

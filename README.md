@@ -14,6 +14,14 @@ I made it on a 55-inch Xiaomi TV and that is where it's been tested most.
 |---|---|
 | <img src="shot_home_liquid_amber.png" alt="Liquid Glass, amber wallpaper"> | <img src="shot_preferences.png" alt="Preferences"> |
 
+| Home with weather | App folders |
+|---|---|
+| <img src="Tinted%20homescreen%20with%20weather.png" alt="Home screen with the weather chip"> | <img src="App%20folders%20in%20the%20app%20drawer.png" alt="App folders in the app drawer"> |
+
+| Color themes in Preferences |
+|---|
+| <img src="Launcher%20prefernces%20page%20with%20color%20theme%20styles.png" alt="Preferences page with color theme styles"> |
+
 ## What it does
 
 - **Three glass styles.** Liquid Glass, Normal and Frost.

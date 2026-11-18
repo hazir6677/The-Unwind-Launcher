@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -218,6 +219,8 @@ fun IntroScreen(onDone: () -> Unit) {
     val leave = { if (!leaving) leaving = true }
     BackHandler(enabled = true) { leave() }
 
+    // the dark overlay (about 64% on average) sits behind the card, so the glass has to know about it
+    CompositionLocalProvider(LocalGlassDim provides 0.64f) {
     Box(
         Modifier
             .fillMaxSize()
@@ -351,5 +354,6 @@ fun IntroScreen(onDone: () -> Unit) {
                 }
             }
         }
+    }
     }
 }

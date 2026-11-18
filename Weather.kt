@@ -478,24 +478,26 @@ fun WeatherChip(data: WeatherData?, modifier: Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.08f else 1f, animationSpec = LiquidSpring, label = "chip")
     val shape = ui.settings.shape.toBarShape()
-    Row(
+    GlassBox(
         modifier
             .height(34.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .glass(shape, focused)
             .onFocusChanged { focused = it.isFocused }
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
+        shape,
+        focused,
+        contentAlignment = Alignment.CenterStart,
     ) {
-        WeatherGlyph(data?.now?.code ?: 2, data?.now?.isDay ?: true, 22.dp)
-        Spacer(Modifier.width(7.dp))
-        Text(
-            if (data != null) "${data.now.temp}\u00B0" else "--",
-            color = Color.White,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
-        )
+        Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            WeatherGlyph(data?.now?.code ?: 2, data?.now?.isDay ?: true, 22.dp)
+            Spacer(Modifier.width(7.dp))
+            Text(
+                if (data != null) "${data.now.temp}\u00B0" else "--",
+                color = inkFg(),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
     }
 }
 
@@ -505,15 +507,15 @@ fun WeatherChip(data: WeatherData?, modifier: Modifier, onClick: () -> Unit) {
 private fun DayColumn(d: WeatherDay, modifier: Modifier) {
     val ui = LocalUi.current
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(d.label, color = Color.White.copy(alpha = 0.78f), fontSize = 12.sp)
+        Text(d.label, color = inkFg(Color.White.copy(alpha = 0.78f)), fontSize = 12.sp)
         Spacer(Modifier.height(2.dp))
         WeatherGlyph(d.code, true, 26.dp)
         Spacer(Modifier.height(2.dp))
-        Text("${d.hi}\u00B0", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        Text("${d.lo}\u00B0", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+        Text("${d.hi}\u00B0", color = inkFg(), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text("${d.lo}\u00B0", color = inkFg(Color.White.copy(alpha = 0.6f)), fontSize = 12.sp)
         Text(
             if (d.rain >= 20) "${d.rain}%" else " ",
-            color = ui.wp.accent,
+            color = inkAccent(ui.wp.accent),
             fontSize = 11.sp,
             textAlign = TextAlign.Center,
         )
@@ -569,14 +571,14 @@ fun WeatherPopup(
                     WeatherGlyph(data.now.code, data.now.isDay, 46.dp)
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("${data.now.temp}\u00B0", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Medium)
+                        Text("${data.now.temp}\u00B0", color = inkFg(), fontSize = 30.sp, fontWeight = FontWeight.Medium)
                         Text(describeWeather(data.now.code), color = ui.wp.accent, fontSize = 12.sp)
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(data.city.label(), color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(data.city.label(), color = inkFg(), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         val unit = if (data.fahrenheit) "mph" else "km/h"
-                        Text("Feels ${data.now.feels}\u00B0", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
-                        Text("${data.now.humidity}%  \u00B7  ${data.now.wind} $unit", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+                        Text("Feels ${data.now.feels}\u00B0", color = inkFg(Color.White.copy(alpha = 0.7f)), fontSize = 11.sp)
+                        Text("${data.now.humidity}%  \u00B7  ${data.now.wind} $unit", color = inkFg(Color.White.copy(alpha = 0.7f)), fontSize = 11.sp)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -586,7 +588,7 @@ fun WeatherPopup(
             } else {
                 Text(
                     error ?: "Getting the weather...",
-                    color = Color.White.copy(alpha = 0.8f),
+                    color = inkFg(Color.White.copy(alpha = 0.8f)),
                     fontSize = 13.sp,
                 )
             }
@@ -624,9 +626,9 @@ fun WeatherPopup(
             Spacer(Modifier.height(8.dp))
             val q = query.trim()
             when {
-                searching -> Text("Searching...", color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-                searchFailed -> Text("Couldn't search. Check the internet connection.", color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-                q.length >= 2 && results.isEmpty() -> Text("No cities found for \"$q\".", color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                searching -> Text("Searching...", color = inkFg(Color.White.copy(alpha = 0.75f)), fontSize = 12.sp)
+                searchFailed -> Text("Couldn't search. Check the internet connection.", color = inkFg(Color.White.copy(alpha = 0.75f)), fontSize = 12.sp)
+                q.length >= 2 && results.isEmpty() -> Text("No cities found for \"$q\".", color = inkFg(Color.White.copy(alpha = 0.75f)), fontSize = 12.sp)
             }
             if (results.isNotEmpty()) {
                 Column(

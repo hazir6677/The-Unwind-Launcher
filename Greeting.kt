@@ -46,13 +46,13 @@ fun GreetingText(g: Greeting, scale: Float = 1f) {
     val shadow = TextStyle(shadow = Shadow(Color(0x66000000), blurRadius = 14f))
     Column {
         if (g.top.isNotBlank()) {
-            Text(g.top, color = Color.White.copy(alpha = 0.92f), fontSize = (15f * scale).sp, style = shadow)
+            Text(g.top, color = inkFg(Color.White.copy(alpha = 0.92f)), fontSize = (15f * scale).sp, style = shadow)
             Spacer(Modifier.height((6f * scale).dp))
         }
         if (g.line1.isNotBlank()) {
             Text(
                 g.line1,
-                color = Color.White,
+                color = inkFg(),
                 fontSize = (54f * scale).sp,
                 lineHeight = (56f * scale).sp,
                 fontWeight = FontWeight.Medium,
@@ -64,7 +64,7 @@ fun GreetingText(g: Greeting, scale: Float = 1f) {
         if (g.line2.isNotBlank()) {
             Text(
                 g.line2,
-                color = ui.wp.accent,
+                color = inkAccent(ui.wp.accent),
                 fontSize = (54f * scale).sp,
                 lineHeight = (56f * scale).sp,
                 fontWeight = FontWeight.Medium,
@@ -87,20 +87,21 @@ private fun FieldCard(
 ) {
     val ui = LocalUi.current
     OptionCard(selected = selected, w = 300.dp, h = 56.dp, modifier = modifier, onClick = onClick) {
-        Box(
-            Modifier.fillMaxSize().glass(RoundedCornerShape(16.dp)),
+        GlassBox(
+            Modifier.fillMaxSize(),
+            RoundedCornerShape(16.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             Column(Modifier.padding(horizontal = 14.dp)) {
                 Text(
                     label,
-                    color = if (selected) ui.wp.accent else Color.White.copy(alpha = 0.7f),
+                    color = if (selected) inkAccent(ui.wp.accent) else inkFg(Color.White.copy(alpha = 0.7f)),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
                     if (value.isEmpty()) hint else if (selected) "$value|" else value,
-                    color = Color.White.copy(alpha = if (value.isEmpty()) 0.5f else 1f),
+                    color = inkFg(Color.White.copy(alpha = if (value.isEmpty()) 0.5f else 1f)),
                     fontSize = 16.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -199,10 +200,13 @@ fun GreetingEditor(
             }
             // Right: live preview and keyboard
             Column {
-                Box(
-                    Modifier.width(446.dp).height(104.dp).glass(RoundedCornerShape(22.dp)).padding(horizontal = 18.dp, vertical = 12.dp),
+                GlassBox(
+                    Modifier.width(446.dp).height(104.dp),
+                    RoundedCornerShape(22.dp),
                     contentAlignment = Alignment.CenterStart,
-                ) { GreetingText(Greeting(small, big1, big2), 0.45f) }
+                ) {
+                    Box(Modifier.padding(horizontal = 18.dp, vertical = 12.dp)) { GreetingText(Greeting(small, big1, big2), 0.45f) }
+                }
                 Spacer(Modifier.height(12.dp))
                 val rows = listOf("abcdefghijk", "lmnopqrstuv", "wxyz'.,!?-&", "1234567890:")
                 rows.forEachIndexed { ri, row ->

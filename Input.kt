@@ -95,21 +95,25 @@ fun SystemTextField(
         }
     }
 
-    Row(
+    GlassBox(
         modifier
             .height(44.dp)
-            .glass(shape, focused || editing)
             .focusRequester(outer)
             .onFocusChanged { focused = it.isFocused }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-            ) { if (!editing) editing = true }
-            .padding(horizontal = 16.dp),
+            ) { if (!editing) editing = true },
+        shape,
+        focused || editing,
+        contentAlignment = Alignment.CenterStart,
+    ) {
+    Row(
+        Modifier.padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = ui.wp.accent, modifier = Modifier.size(22.dp))
+            Icon(icon, contentDescription = null, tint = inkAccent(ui.wp.accent), modifier = Modifier.size(22.dp))
             Spacer(Modifier.width(10.dp))
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
@@ -118,7 +122,7 @@ fun SystemTextField(
                     value = value,
                     onValueChange = onValueChange,
                     singleLine = true,
-                    textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                    textStyle = TextStyle(color = inkFg(), fontSize = 16.sp),
                     cursorBrush = SolidColor(ui.wp.accent),
                     keyboardOptions = KeyboardOptions(imeAction = imeAction),
                     keyboardActions = KeyboardActions(
@@ -141,7 +145,7 @@ fun SystemTextField(
                     decorationBox = { field ->
                         Box(contentAlignment = Alignment.CenterStart) {
                             if (value.isEmpty()) {
-                                Text(hint, color = Color.White.copy(alpha = 0.6f), fontSize = 16.sp, maxLines = 1)
+                                Text(hint, color = inkFg(Color.White.copy(alpha = 0.6f)), fontSize = 16.sp, maxLines = 1)
                             }
                             field()
                         }
@@ -150,12 +154,13 @@ fun SystemTextField(
             } else {
                 Text(
                     if (value.isEmpty()) hint else value,
-                    color = Color.White.copy(alpha = if (value.isEmpty()) 0.65f else 1f),
+                    color = inkFg(Color.White.copy(alpha = if (value.isEmpty()) 0.65f else 1f)),
                     fontSize = 16.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+    }
     }
 }

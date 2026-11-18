@@ -116,6 +116,21 @@ fun contrastRatio(l1: Float, l2: Float): Float {
 /** Dark adaptation for a pixel whose gamma-space luma is [lg]. Shared by the baker and the legibility sampler. */
 fun darkTintFor(lg: Float): Float = LG.TINT_DARK_MAX * smooth(0.35f, 0.9f, lg * lg)
 
+// pow(x, 2.2) and pow(x, 1/2.2) through tables (interpolated): same result to ~1e-5, far cheaper per pixel
+private const val G_N = 1024
+private val G22 = FloatArray(G_N + 2) { (it.coerceAtMost(G_N).toFloat() / G_N).pow(2.2f) }
+private val G22I = FloatArray(G_N + 2) { (it.coerceAtMost(G_N).toFloat() / G_N).pow(1f / 2.2f) }
+
+private fun lut(t: FloatArray, v: Float): Float {
+    val x = (if (v < 0f) 0f else if (v > 1f) 1f else v) * G_N
+    val i = x.toInt()
+    val f = x - i
+    return t[i] + (t[i + 1] - t[i]) * f
+}
+
+private fun gamma22(v: Float) = lut(G22, v)
+private fun gamma22Inv(v: Float) = lut(G22I, v)
+
 private fun clamp01(v: Float) = if (v < 0f) 0f else if (v > 1f) 1f else v
 private fun smooth(e0: Float, e1: Float, x: Float): Float {
     val t = clamp01((x - e0) / (e1 - e0))
@@ -318,6 +333,7 @@ fun bakeLiquid(bd: LgBackdrop, p: LgParams): LgBake {
     val contactBlur = LG.CONTACT_BLUR * d
     val offY = LG.SHADOW_OFFSET_Y * d * (0.4f + 0.6f * min(1f, minSide / (200f * d)))
     val cOffY = LG.CONTACT_OFFSET_Y * d
+    val lightReach = max(rimW * 1.25f, max(glowW * 3.2f, rimW * 2f + glowW * 2.1f))
 
     for (j in 0 until bh) {
         val ly = j - pad + 0.5f
@@ -326,8 +342,11 @@ fun bakeLiquid(bd: LgBackdrop, p: LgParams): LgBake {
             val sd = shape.sdf(lx, ly, n)
             var r = 0f; var g = 0f; var b = 0f; var a = 0f
 
+            val cov = clamp01(0.5f - sd) // anti-aliased coverage of the glass body
+
             // ---- shadows (outside, and also faintly under the glass so thin glass still has weight) ----
-            if (p.shadow) {
+            // Skipped deep inside an opaque body: it is fully covered there, so it can never show.
+            if (p.shadow && !(p.opaqueInterior && cov >= 1f)) {
                 val sdD = shape.sdf(lx, ly - offY, null)
                 val big = dropK * (1f - smooth(-shadowBlur * 0.35f, shadowBlur * 0.65f, sdD))
                 val sdC = shape.sdf(lx, ly - cOffY, null)
@@ -336,7 +355,6 @@ fun bakeLiquid(bd: LgBackdrop, p: LgParams): LgBake {
                 a = sh
             }
 
-            val cov = clamp01(0.5f - sd) // anti-aliased coverage of the glass body
             if (cov > 0f) {
                 val u = (-sd).coerceAtLeast(0f)            // depth into the glass, px
                 val s = u / bezel                           // 0 at edge .. 1 at the end of the bezel
@@ -361,9 +379,9 @@ fun bakeLiquid(bd: LgBackdrop, p: LgParams): LgBake {
                 // ---- busy backgrounds get calmed toward their average so text stays readable ----
                 if (p.calm > 0f) {
                     // blend in linear light (the region mean is a linear-light average), then back to gamma
-                    cr = (cr.pow(2.2f) * (1f - p.calm) + p.meanR * p.calm).pow(1f / 2.2f)
-                    cg = (cg.pow(2.2f) * (1f - p.calm) + p.meanG * p.calm).pow(1f / 2.2f)
-                    cb = (cb.pow(2.2f) * (1f - p.calm) + p.meanB * p.calm).pow(1f / 2.2f)
+                    cr = gamma22Inv(gamma22(cr) * (1f - p.calm) + p.meanR * p.calm)
+                    cg = gamma22Inv(gamma22(cg) * (1f - p.calm) + p.meanG * p.calm)
+                    cb = gamma22Inv(gamma22(cb) * (1f - p.calm) + p.meanB * p.calm)
                 }
 
                 // ---- color: saturate, lift, tint ----
@@ -391,17 +409,23 @@ fun bakeLiquid(bd: LgBackdrop, p: LgParams): LgBake {
                 }
 
                 // ---- light: depends on which way the edge faces ----
-                val nl = n[0] * LG.LIGHT_X + n[1] * LG.LIGHT_Y   // +1 facing the light, -1 facing away
-                val spec = max(abs(nl).pow(1.6f) * (if (nl > 0f) 1f else 0.72f), 0.10f) // 2 lobes, weak sides
-                // thin rim: strongest right at the edge, gone after rimW
-                val rim = (1f - smooth(rimW * 0.35f, rimW * 1.25f, u)) * rimK * spec
-                // soft inner glow just inside the rim, mostly on the lit side
-                val glowSide = 0.35f + 0.65f * clamp01(nl * 0.5f + 0.5f)
-                val glow = exp(-u / glowW * 2.4f) * glowK * glowSide
-                // subtle inner shadow on the side facing away from the light, a bit further in
-                val away = clamp01(-nl)
-                val ish = (u - rimW * 2f) / (glowW * 0.8f)
-                val innerSh = away * exp(-(ish * ish)) * innerShK
+                var rim = 0f
+                var glow = 0f
+                var innerSh = 0f
+                // Past this depth every light term is below 1/255, so the pow/exp work is skipped (most pixels).
+                if (u < lightReach) {
+                    val nl = n[0] * LG.LIGHT_X + n[1] * LG.LIGHT_Y   // +1 facing the light, -1 facing away
+                    val spec = max(abs(nl).pow(1.6f) * (if (nl > 0f) 1f else 0.72f), 0.10f) // 2 lobes, weak sides
+                    // thin rim: strongest right at the edge, gone after rimW
+                    rim = (1f - smooth(rimW * 0.35f, rimW * 1.25f, u)) * rimK * spec
+                    // soft inner glow just inside the rim, mostly on the lit side
+                    val glowSide = 0.35f + 0.65f * clamp01(nl * 0.5f + 0.5f)
+                    glow = exp(-u / glowW * 2.4f) * glowK * glowSide
+                    // subtle inner shadow on the side facing away from the light, a bit further in
+                    val away = clamp01(-nl)
+                    val ish = (u - rimW * 2f) / (glowW * 0.8f)
+                    innerSh = away * exp(-(ish * ish)) * innerShK
+                }
 
                 var wr = cr; var wg = cg; var wb = cb
                 wr = wr * (1f - innerSh)

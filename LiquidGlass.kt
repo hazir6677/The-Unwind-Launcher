@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
@@ -107,6 +108,15 @@ private class LiquidLook {
     val fade = Animatable(1f)
     var prevLight: Boolean? = null
 }
+
+/** Two background-priority threads for baking, so a burst of bakes (new wallpaper, a page full of tiles) cannot starve the UI thread. */
+private val BakeDispatcher: kotlinx.coroutines.CoroutineDispatcher =
+    java.util.concurrent.Executors.newFixedThreadPool(2) { r ->
+        Thread({
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
+            r.run()
+        }, "liquid-bake").apply { isDaemon = true }
+    }.asCoroutineDispatcher()
 
 private object LiquidCache {
     val lru = object : LruCache<String, Baked>(28 * 1024 * 1024) {
@@ -182,7 +192,7 @@ private fun rememberLiquidLook(node: GlassNode, shape: Shape, enabled: Boolean, 
             val key = "${System.identityHashCode(dd)}|$w|$h|${radius.toInt()}|${x.toInt()}|${y.toInt()}|" +
                 "${(ch.scrim * 100).toInt()}|${(ch.calm * 10).toInt()}|${ch.scrimIsDark}|${(st.mean * 24).toInt()}|" +
                 "$overlayOnly|${(dim * 100).toInt()}|${(d * 100).toInt()}|$generic"
-            val baked = LiquidCache.lru.get(key) ?: withContext(Dispatchers.Default) {
+            val baked = LiquidCache.lru.get(key) ?: withContext(BakeDispatcher) {
                 val p = LgParams(
                     w = w, h = h, radius = radius, x = x, y = y,
                     screenW = screen.width, screenH = screen.height,

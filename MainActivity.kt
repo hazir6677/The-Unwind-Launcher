@@ -1,6 +1,7 @@
 package com.unwind.launcher
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -16,6 +17,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -138,6 +143,12 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     var openFolder by remember { mutableStateOf<String?>(null) }
     var moveApp by remember { mutableStateOf<AppEntry?>(null) }
     val moveFocus = remember { FocusRequester() }
+    var prefTab by remember { mutableStateOf(PrefTab.Look) }
+    val updater = remember { UpdateController(ctx.applicationContext, scope, prefs) }
+    var backups by remember { mutableStateOf(Backup.list(ctx)) }
+    var backupStatus by remember { mutableStateOf("") }
+    var bannerVer by remember { mutableStateOf<String?>(null) }
+    var bannerSeen by remember { mutableStateOf("") }
 
     val baseWp = wall?.wp ?: WALLPAPERS[settings.wallpaper.coerceIn(0, WALLPAPERS.lastIndex)]
     val wp = remember(baseWp, settings.colorTheme) { baseWp.withTheme(settings.colorTheme) }
@@ -190,6 +201,92 @@ fun LauncherApp(tick: Int, homeTick: Int) {
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) applyPicked(uri)
         }
+
+    // Motion and sound follow the Preferences switches everywhere at once
+    SideEffect {
+        Motion.bouncy = settings.bouncy
+        Sfx.pack = settings.soundPack
+        Sfx.volume = settings.soundVolume.gain
+    }
+    LaunchedEffect(Unit) { Sfx.init(ctx.applicationContext) }
+
+    // Updates: check shortly after opening and then every few hours; carry on installing after the permission screen
+    LaunchedEffect(tick) { updater.onResume() }
+    LaunchedEffect(settings.autoUpdate) {
+        if (!settings.autoUpdate) return@LaunchedEffect
+        delay(4000)
+        while (true) {
+            if (System.currentTimeMillis() - updater.ui.checkedAt >= UPDATE_EVERY_MS) updater.check(manual = false)
+            delay(60 * 60 * 1000L)
+        }
+    }
+    val pendingVer = updater.ui.release?.version?.takeIf { updater.ui.phase == UpPhase.Available || updater.ui.phase == UpPhase.Ready }
+    LaunchedEffect(pendingVer) {
+        if (pendingVer != null && pendingVer != bannerSeen) {
+            bannerSeen = pendingVer
+            bannerVer = pendingVer
+            delay(9000)
+            bannerVer = null
+        }
+    }
+
+    // Saving and restoring the whole setup
+    fun finishRestore(r: Result<Int>) {
+        if (r.isSuccess) {
+            Toast.makeText(ctx, "Setup restored. Restarting Unwind...", Toast.LENGTH_SHORT).show()
+            (ctx as? Activity)?.recreate()
+        } else {
+            backupStatus = "Couldn't restore: " + (r.exceptionOrNull()?.message ?: "that file didn't work.")
+        }
+    }
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val r = withContext(Dispatchers.IO) {
+                    runCatching { ctx.contentResolver.openOutputStream(uri)!!.use { Backup.write(ctx, it) } }
+                }
+                backupStatus = if (r.isSuccess) "Setup saved." else "Couldn't save: " + (r.exceptionOrNull()?.message ?: "unknown problem")
+            }
+        }
+    }
+    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val r = withContext(Dispatchers.IO) {
+                    runCatching { ctx.contentResolver.openInputStream(uri)!!.use { Backup.read(ctx, it) } }
+                }
+                finishRestore(r)
+            }
+        }
+    }
+    fun saveBackup() {
+        try {
+            saveLauncher.launch(Backup.suggestedName())
+        } catch (e: Exception) {
+            // no file browser on this TV: keep it in Unwind's own folder instead
+            scope.launch {
+                val r = withContext(Dispatchers.IO) { runCatching { Backup.saveToAppDir(ctx) } }
+                backups = Backup.list(ctx)
+                backupStatus = r.fold(
+                    { "This TV has no file browser, so the setup was saved inside Unwind: ${it.name}. It shows below." },
+                    { "Couldn't save: " + (it.message ?: "unknown problem") },
+                )
+            }
+        }
+    }
+    fun restoreBackup() {
+        try {
+            restoreLauncher.launch(arrayOf("*/*"))
+        } catch (e: Exception) {
+            backupStatus = "This TV has no file browser. Use a setup from the list below, if you have one."
+        }
+    }
+    fun restoreFile(f: java.io.File) {
+        scope.launch {
+            val r = withContext(Dispatchers.IO) { runCatching { f.inputStream().use { Backup.read(ctx, it) } } }
+            finishRestore(r)
+        }
+    }
 
     LaunchedEffect(tick) { apps = withContext(Dispatchers.Default) { loadApps(ctx) } }
     LaunchedEffect(homeTick) {
@@ -383,6 +480,7 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                     ),
                 )
 
+                Box(Modifier.fillMaxSize().bounceIn(screen)) {
                 when (screen) {
                     Screen.Home -> HomeContent(
                         favApps = favApps,
@@ -424,6 +522,14 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                         onOpenHomeSettings = { openHomeSettings(ctx) },
                         onEditGreeting = { greetPart = it; screen = Screen.Greeting },
                         onReplayIntro = { showIntro = true },
+                        tab = prefTab,
+                        onTab = { prefTab = it },
+                        updater = updater,
+                        backups = backups,
+                        backupStatus = backupStatus,
+                        onSaveBackup = { saveBackup() },
+                        onRestoreBackup = { restoreBackup() },
+                        onRestoreFile = { restoreFile(it) },
                     )
                     Screen.Greeting -> GreetingEditor(
                         part = greetPart,
@@ -443,6 +549,7 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                         onBrowse = { browseFiles() },
                         onPick = { applyPicked(it.uri) },
                     )
+                }
                 }
 
                 // Header: always says which screen you're on
@@ -497,7 +604,17 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                     toContent = contentReq,
                     chip = chipReq,
                     modifier = Modifier.align(Alignment.CenterStart).padding(start = 33.dp, top = 24.dp),
+                    badge = if (updater.hasUpdate) 3 else -1,
                 )
+            }
+
+            AnimatedVisibility(
+                visible = bannerVer != null && popup == Popup.None && !showIntro,
+                enter = slideInVertically(spring(0.5f, 300f)) { -it * 2 } + fadeIn(),
+                exit = slideOutVertically { -it * 2 } + fadeOut(),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 18.dp),
+            ) {
+                UpdateBanner(bannerVer ?: bannerSeen)
             }
 
             if (popup != Popup.None) {

@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.BitmapShader
 import android.graphics.Matrix
 import android.graphics.Shader
+import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
@@ -42,7 +43,7 @@ import kotlin.math.roundToInt
 val LocalOnDock = compositionLocalOf { false }
 
 /** One springy motion curve used everywhere, so the whole UI moves like one liquid. */
-val LiquidSpring = spring<Float>(dampingRatio = 0.68f, stiffness = 280f)
+val LiquidSpring: SpringSpec<Float> get() = focusSpring()
 
 // ---------- Bitmap helpers ----------
 

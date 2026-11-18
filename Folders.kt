@@ -84,7 +84,7 @@ private fun FolderCard(name: String, apps: List<AppEntry>, modifier: Modifier, o
         modifier
             .width(box + 14.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) Sfx.move() }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

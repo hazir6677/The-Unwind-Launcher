@@ -145,7 +145,7 @@ fun FocusBox(
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .then(if (selected) Modifier.background(ui.wp.accent, shape) else Modifier)
             .liquidFocus(shape, focused)
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) Sfx.move() }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -253,7 +253,7 @@ fun Tile(
             )
             .onFocusChanged {
                 focused = it.isFocused
-                if (it.isFocused) onFocus()
+                if (it.isFocused) { onFocus(); Sfx.move() }
             }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -346,6 +346,7 @@ fun Rail(
     toContent: FocusRequester,
     chip: FocusRequester,
     modifier: Modifier,
+    badge: Int = -1,
 ) {
     val ui = LocalUi.current
     val btnShape = ui.settings.shape.toShape()
@@ -357,7 +358,7 @@ fun Rail(
     // the highlight is one blob that slides (and slightly overshoots) to the current page
     val slide by animateFloatAsState(
         selected.toFloat(),
-        animationSpec = spring(dampingRatio = 0.72f, stiffness = 240f),
+        animationSpec = focusSpring(),
         label = "railSlide",
     )
     GlassBox(modifier.width(71.dp), ui.settings.shape.toBarShape(), strict = false) {
@@ -387,15 +388,24 @@ fun Rail(
             verticalArrangement = Arrangement.spacedBy(gap),
         ) {
             icons.forEachIndexed { i, icon ->
-                FocusButton(
-                    icon,
-                    btn,
-                    btnShape,
-                    modifier = Modifier.focusRequester(reqs[i]).dpad(right = toContent, up = if (i == 0) chip else null),
-                    selected = selected == i,
-                    filled = false,
-                    onClick = { onClick(i) },
-                )
+                Box {
+                    FocusButton(
+                        icon,
+                        btn,
+                        btnShape,
+                        modifier = Modifier.focusRequester(reqs[i]).dpad(right = toContent, up = if (i == 0) chip else null),
+                        selected = selected == i,
+                        filled = false,
+                        onClick = { onClick(i) },
+                    )
+                    // a small dot: there is an update waiting
+                    if (i == badge) {
+                        Box(
+                            Modifier.align(Alignment.TopEnd).padding(5.dp).size(11.dp)
+                                .clip(CircleShape).background(Color.White).border(2.dp, ui.wp.dark, CircleShape),
+                        )
+                    }
+                }
             }
         }
     }
@@ -480,7 +490,7 @@ fun PopupRow(
                 },
             )
             .liquidFocus(shape, focused)
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) Sfx.move() }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -648,7 +658,8 @@ fun PopupLayer(popup: Popup, fromStart: Boolean = false, onDismiss: () -> Unit, 
             Modifier
                 .align(if (fromStart) Alignment.TopStart else Alignment.TopEnd)
                 .padding(top = if (fromStart) 104.dp else 72.dp, start = if (fromStart) 33.dp else 0.dp, end = if (fromStart) 0.dp else 24.dp)
-                .pointerInput(popup) { detectTapGestures { } },
+                .pointerInput(popup) { detectTapGestures { } }
+                .bounceIn(popup, 14.dp),
         ) { content() }
     }
 }

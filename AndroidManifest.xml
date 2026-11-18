@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- In-app updates: lets Unwind hand a downloaded update to Android to install. Android asks you to switch it on. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Google account chip in the top bar -->
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
@@ -63,5 +66,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- Android reports back here while an update installs (shows the "Install?" screen, or an error) -->
+        <receiver android:name=".InstallReceiver" android:exported="false" />
     </application>
 </manifest>

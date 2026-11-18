@@ -99,7 +99,7 @@ fun SystemTextField(
         modifier
             .height(44.dp)
             .focusRequester(outer)
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) Sfx.move() }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

@@ -17,7 +17,8 @@ android {
         targetSdk = 34
         // Goes up by one on every GitHub build, so Android always sees the new APK as an update
         versionCode = 100 + (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0)
-        versionName = "2.5"
+        // A release tag like v2.4 sets this automatically (see the build file); builds without a tag use the fallback
+        versionName = System.getenv("UNWIND_VERSION_NAME") ?: "2.4"
     }
 
     signingConfigs {

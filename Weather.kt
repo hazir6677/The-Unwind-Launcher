@@ -482,7 +482,7 @@ fun WeatherChip(data: WeatherData?, modifier: Modifier, onClick: () -> Unit) {
         modifier
             .height(34.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) Sfx.move() }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
         shape,
         focused,

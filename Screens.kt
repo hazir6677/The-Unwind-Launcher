@@ -47,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -257,7 +258,7 @@ fun KeyCap(label: String, w: Dp, modifier: Modifier, active: Boolean = false, on
         modifier
             .size(w, 38.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) Sfx.move() }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -346,7 +347,7 @@ fun OptionCard(
                 if (focused) Color.White else if (selected) ui.wp.accent else Color.White.copy(alpha = 0.25f),
                 shape,
             )
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged { focused = it.isFocused; if (it.isFocused) Sfx.move() }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -407,7 +408,7 @@ private fun WallCard(
 }
 
 @Composable
-private fun GuideStep(n: Int, text: String) {
+fun GuideStep(n: Int, text: String) {
     val ui = LocalUi.current
     Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
         Box(
@@ -420,7 +421,7 @@ private fun GuideStep(n: Int, text: String) {
 }
 
 @Composable
-private fun ToggleCard(label: String, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
+fun ToggleCard(label: String, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val ui = LocalUi.current
     OptionCard(selected = false, w = 260.dp, h = 56.dp, modifier = modifier, onClick = onClick) {
         Row(
@@ -492,6 +493,14 @@ fun SettingsScreen(
     onOpenHomeSettings: () -> Unit,
     onEditGreeting: (DayPart) -> Unit,
     onReplayIntro: () -> Unit,
+    tab: PrefTab,
+    onTab: (PrefTab) -> Unit,
+    updater: UpdateController,
+    backups: List<java.io.File>,
+    backupStatus: String,
+    onSaveBackup: () -> Unit,
+    onRestoreBackup: () -> Unit,
+    onRestoreFile: (java.io.File) -> Unit,
 ) {
     val ui = LocalUi.current
     val ctx = LocalContext.current
@@ -511,7 +520,7 @@ fun SettingsScreen(
         customThumb = pair.first
         bingThumb = pair.second
     }
-    LaunchedEffect(focusKick, thumbs.size) {
+    LaunchedEffect(focusKick) {
         delay(200)
         runCatching { nav.content.requestFocus() }
     }
@@ -521,30 +530,34 @@ fun SettingsScreen(
     val isStock = settings.wallSource == WallSource.Stock
     val toRail = Modifier.dpad(left = nav.rail)
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(start = 150.dp, top = 84.dp, end = 24.dp)
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 60.dp),
-    ) {
+    Column(Modifier.fillMaxSize().padding(start = 150.dp, top = 84.dp, end = 24.dp)) {
+        PrefTabBar(tab, onTab, nav, updater.hasUpdate)
+        Spacer(Modifier.height(16.dp))
+        key(tab) {
+        Column(Modifier.fillMaxSize().bounceIn(tab, 12.dp).verticalScroll(rememberScrollState()).padding(bottom = 60.dp)) {
+        when (tab) {
+        PrefTab.Feel -> FeelTab(settings, nav, onChange)
+        PrefTab.Backup -> BackupTab(nav, backups, backupStatus, onSaveBackup, onRestoreBackup, onRestoreFile)
+        PrefTab.Updates -> UpdatesTab(settings, nav, updater, onChange)
+        PrefTab.Home -> HomeSetupTab(nav, onOpenHomeSettings)
+        PrefTab.Look -> {
         // Wallpaper
         SectionTitle("Wallpaper", "Icons and glass pick up its colors, whatever picture you choose")
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             WallCard(
                 "Daily wallpaper", bingThumb, "Daily", isBing,
-                (if (isBing) Modifier.focusRequester(nav.content) else Modifier).dpad(left = nav.rail, up = nav.pill),
+                Modifier.dpad(left = nav.rail, up = nav.content),
             ) { onChange(settings.copy(wallSource = WallSource.Bing)) }
             WallCard(
                 "My photo", customThumb, "+ Choose", isCustom,
-                (if (isCustom) Modifier.focusRequester(nav.content) else Modifier).dpad(up = nav.pill),
+                Modifier.dpad(up = nav.content),
                 onPickCustom,
             )
             WALLPAPERS.forEachIndexed { i, w ->
                 val sel = isStock && settings.wallpaper == i
                 WallCard(
                     w.name, thumbs.getOrNull(i), "", sel,
-                    (if (sel) Modifier.focusRequester(nav.content) else Modifier).dpad(up = nav.pill),
+                    Modifier.dpad(up = nav.content),
                 ) { onChange(settings.copy(wallSource = WallSource.Stock, wallpaper = i)) }
             }
         }
@@ -762,29 +775,13 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(24.dp))
 
-        // Home screen replacement guide
-        SectionTitle("Make Unwind your Home screen", "So the Home button on your remote opens Unwind")
-        GlassBox(Modifier.width(560.dp), RoundedCornerShape(18.dp)) {
-        Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
-            GuideStep(1, "Press the Home button on your remote.")
-            GuideStep(2, "If the TV asks which Home app to use, pick Unwind, then choose Always.")
-            GuideStep(3, "No question? Tap the button below and pick Unwind there.")
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "To switch back: pick your TV's original Home app in the same place, or uninstall Unwind.",
-                color = inkFg(Color.White.copy(alpha = 0.72f)),
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-            )
-        }
-        }
-        Spacer(Modifier.height(12.dp))
-        ActionCard("Open Home settings", toRail, 240.dp, onOpenHomeSettings)
-        Spacer(Modifier.height(24.dp))
-
         // Welcome screen
         SectionTitle("Welcome screen", "See the intro that shows the first time Unwind opens")
         ActionCard("Replay welcome screen", toRail, 240.dp, onReplayIntro)
+        }
+        }
+        }
+        }
     }
 }
 

@@ -79,6 +79,20 @@ val DEFAULT_GREETINGS: Map<DayPart, Greeting> = mapOf(
     DayPart.Night to Greeting("Good night", "Time to", "unwind"),
 )
 
+/** Tiny nature sounds that play when the highlight moves. Generated on the device, no audio files. */
+enum class SoundPack(val label: String, val blurb: String) {
+    Off("Off", "Silent"),
+    Droplet("Water drop", "A soft drip, like a pond"),
+    Chime("Wind chime", "A tiny glass chime"),
+    Bamboo("Bamboo", "A hollow wooden tap"),
+    Bird("Songbird", "A short morning chirp"),
+    Pebble("Pebble", "A stone dropped in a stream"),
+}
+
+enum class SoundVolume(val label: String, val gain: Float) {
+    Low("Low", 0.22f), Medium("Medium", 0.45f), High("High", 0.8f),
+}
+
 /** Where the wallpaper comes from. */
 enum class WallSource { Stock, Bing, Custom }
 
@@ -188,6 +202,10 @@ data class LauncherSettings(
     val dockPos: DockPos = DockPos.Default,
     val appsView: AppsView = AppsView.List,
     val greetings: Map<DayPart, Greeting> = DEFAULT_GREETINGS,
+    val bouncy: Boolean = true,
+    val soundPack: SoundPack = SoundPack.Droplet,
+    val soundVolume: SoundVolume = SoundVolume.Medium,
+    val autoUpdate: Boolean = true,
 )
 
 private inline fun <reified T : Enum<T>> parseEnum(s: String?, def: T): T =
@@ -208,6 +226,10 @@ fun loadSettings(ctx: Context): LauncherSettings {
         dock = p.getBoolean("dock", d.dock),
         dockPos = parseEnum(p.getString("dockPos", null), d.dockPos),
         appsView = parseEnum(p.getString("appsView", null), d.appsView),
+        bouncy = p.getBoolean("bouncy", d.bouncy),
+        soundPack = parseEnum(p.getString("soundPack", null), d.soundPack),
+        soundVolume = parseEnum(p.getString("soundVolume", null), d.soundVolume),
+        autoUpdate = p.getBoolean("autoUpdate", d.autoUpdate),
         greetings = DayPart.values().associateWith { part ->
             val parts = p.getString("greet_${part.name}", null)?.split(GREET_SEP)
             if (parts != null && parts.size == 3) Greeting(parts[0], parts[1], parts[2])
@@ -229,6 +251,10 @@ fun saveSettings(ctx: Context, s: LauncherSettings) {
         .putBoolean("dock", s.dock)
         .putString("dockPos", s.dockPos.name)
         .putString("appsView", s.appsView.name)
+        .putBoolean("bouncy", s.bouncy)
+        .putString("soundPack", s.soundPack.name)
+        .putString("soundVolume", s.soundVolume.name)
+        .putBoolean("autoUpdate", s.autoUpdate)
         .also { e ->
             // Only greetings you changed are stored, so untouched ones keep following the defaults
             for (part in DayPart.values()) {

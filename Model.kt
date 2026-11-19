@@ -14,9 +14,17 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 enum class GlassStyle(val label: String, val blurb: String) {
-    Liquid("Liquid Glass", "Refraction, fluid motion"),
-    Normal("Normal", "Tinted, soft blur"),
-    Frost("Frost Glass", "Heavy blur, milky"),
+    Clear("Clear", "See-through, light edge"),
+    Tinted("Tinted", "Tinted, soft blur"),
+    Frosted("Frosted", "Heavy blur, milky"),
+}
+
+/** Reads a saved tint style. Older saves and backups used the names Liquid, Normal and Frost. */
+private fun parseGlass(s: String?, def: GlassStyle): GlassStyle = when (s) {
+    "Liquid", "Clear" -> GlassStyle.Clear
+    "Normal", "Tinted" -> GlassStyle.Tinted
+    "Frost", "Frosted" -> GlassStyle.Frosted
+    else -> def
 }
 
 /** Three palettes pulled from the same wallpaper, like Material You on Pixel. */
@@ -196,7 +204,7 @@ data class LauncherSettings(
     val showNames: Boolean = true,
     val iconStyle: IconStyle = IconStyle.Themed,
     val colorTheme: ColorTheme = ColorTheme.Mixed,
-    val glass: GlassStyle = GlassStyle.Normal,
+    val glass: GlassStyle = GlassStyle.Tinted,
     val homeLayout: HomeLayout = HomeLayout.Endless,
     val dock: Boolean = false,
     val dockPos: DockPos = DockPos.Default,
@@ -221,7 +229,7 @@ fun loadSettings(ctx: Context): LauncherSettings {
         showNames = p.getBoolean("showNames", d.showNames),
         iconStyle = parseEnum(p.getString("iconStyle", null), d.iconStyle),
         colorTheme = parseEnum(p.getString("colorTheme", null), d.colorTheme),
-        glass = parseEnum(p.getString("glass", null), d.glass),
+        glass = parseGlass(p.getString("glass", null), d.glass),
         homeLayout = parseEnum(p.getString("homeLayout", null), d.homeLayout),
         dock = p.getBoolean("dock", d.dock),
         dockPos = parseEnum(p.getString("dockPos", null), d.dockPos),
@@ -276,6 +284,7 @@ class Nav(
 )
 
 /** Everything the glass/theme code needs, provided once at the root. */
+@androidx.compose.runtime.Immutable
 class UiCtx(
     val settings: LauncherSettings,
     val wp: Wp,

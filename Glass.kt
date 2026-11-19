@@ -42,8 +42,8 @@ import kotlin.math.roundToInt
 /** True for tiles sitting on the dock. They get a more solid body so they read against the dock glass. */
 val LocalOnDock = compositionLocalOf { false }
 
-/** One springy motion curve used everywhere, so the whole UI moves like one liquid. */
-val LiquidSpring: SpringSpec<Float> get() = focusSpring()
+/** One springy motion curve used everywhere, so the whole UI moves together. */
+val GlassSpring: SpringSpec<Float> get() = focusSpring()
 
 // ---------- Bitmap helpers ----------
 
@@ -64,7 +64,10 @@ fun scaleDown(src: Bitmap, w: Int, h: Int): Bitmap {
 }
 
 /** Pre-blurred copies of the wallpaper, already cropped to the screen's shape so glass lines up with it. */
-class Backdrops(val soft: Bitmap, val heavy: Bitmap, val liquid: LiquidData?)
+class Backdrops(val soft: Bitmap, val heavy: Bitmap, val clear: ClearBackdrop?)
+
+/** What the Clear style looks through: a small lightly blurred wallpaper copy, plus the tiny luminance map for text colour. */
+class ClearBackdrop(val bitmap: Bitmap, val luma: LumaMap)
 
 private fun blurPass(src: IntArray, dst: IntArray, w: Int, h: Int, r: Int, horizontal: Boolean) {
     val lines = if (horizontal) h else w
@@ -102,14 +105,19 @@ private fun cropToAspect(src: Bitmap, aspect: Float): Bitmap {
 }
 
 /**
- * [scrimA] and [screenWidthPx] let the Liquid backdrop match what is really behind the glass: the wallpaper with the
- * launcher's own scrims on top, softened by a small blur (see LG.BLUR_PX).
+ * Builds the three wallpaper copies the panels look through. Everything here is tiny (the biggest is
+ * 480 px wide) so it finishes in a few tens of milliseconds, and it runs once per wallpaper off the UI thread.
+ * [scrimA] makes the Clear copy match what is really behind the panel: the wallpaper with the launcher's own scrims.
  */
-fun makeBackdrops(src: Bitmap, aspect: Float, scrimA: Float, screenWidthPx: Int): Backdrops {
+fun makeBackdrops(src: Bitmap, aspect: Float, scrimA: Float): Backdrops {
     val cropped = cropToAspect(src, aspect)
+    // shrink once to a working size so the three copies below don't each start from a 4K picture
+    val workW = 480
+    val workH = max(14, (workW / aspect).roundToInt())
+    val work = scaleDown(cropped, workW, workH)
     fun blurred(w: Int, r: Int, passes: Int): Bitmap {
         val h = max(14, (w / aspect).roundToInt())
-        val small = scaleDown(cropped, w, h)
+        val small = if (w == workW) work else Bitmap.createScaledBitmap(work, w, h, true)
         val a = IntArray(w * h)
         small.getPixels(a, 0, w, 0, 0, w, h)
         val b = IntArray(w * h)
@@ -121,17 +129,16 @@ fun makeBackdrops(src: Bitmap, aspect: Float, scrimA: Float, screenWidthPx: Int)
         out.setPixels(a, 0, w, 0, 0, w, h)
         return out
     }
-    // Liquid: about 960 wide (half of a 1080p screen) so the rim stays sharp, then scrims and a light blur
-    val lw = 960
-    val lh = max(14, (lw / aspect).roundToInt())
-    val lsmall = scaleDown(cropped, lw, lh)
-    val lpx = IntArray(lw * lh)
-    lsmall.getPixels(lpx, 0, lw, 0, 0, lw, lh)
-    for (i in lpx.indices) lpx[i] = lpx[i] or (0xFF shl 24)
+    val px = IntArray(workW * workH)
+    work.getPixels(px, 0, workW, 0, 0, workW, workH)
+    for (i in px.indices) px[i] = px[i] or (0xFF shl 24)
+    val cd = buildClearData(px, workW, workH, scrimA)
+    val clearBmp = Bitmap.createBitmap(workW, workH, Bitmap.Config.ARGB_8888)
+    clearBmp.setPixels(cd.blurred, 0, workW, 0, 0, workW, workH)
     return Backdrops(
         soft = blurred(160, 2, 2),
         heavy = blurred(56, 2, 3),
-        liquid = buildLiquidData(lpx, lw, lh, scrimA, screenWidthPx),
+        clear = ClearBackdrop(clearBmp, cd.luma),
     )
 }
 
@@ -177,8 +184,8 @@ private fun backdropBrush(
 /**
  * Draws a glass surface in one of three styles.
  *
- * Liquid: real refraction, baked per element (see LiquidCore.kt / LiquidGlass.kt).
- * Normal / Frost: the wallpaper blurred behind a tint (unchanged).
+ * Clear: the wallpaper behind a lens-like edge, drawn on the GPU (see ClearGlass.kt).
+ * Tinted / Frosted: the wallpaper blurred behind a tint.
  *
  * Everything is drawn as anti-aliased paths, so edges stay smooth even while scaling.
  * [idle] = false means: only draw while focused (used for small buttons).
@@ -196,9 +203,9 @@ fun Modifier.glass(
 ): Modifier {
     val ui = LocalUi.current
     val st = style ?: ui.settings.glass
-    // Liquid has its own renderer (LiquidGlass.kt); Normal and Frost are untouched below.
-    return if (st == GlassStyle.Liquid && ui.backdrops?.liquid != null) {
-        liquidGlass(shape, focused, idle, node ?: remember { GlassNode() }, strict, overlayOnly)
+    // Clear has its own renderer (ClearGlass.kt); Tinted and Frosted are below.
+    return if (st == GlassStyle.Clear && ui.backdrops?.clear != null) {
+        clearGlass(shape, focused, idle, node ?: remember { GlassNode() }, strict, overlayOnly)
     } else {
         classicGlass(shape, focused, style, blur, idle)
     }
@@ -215,7 +222,7 @@ private fun Modifier.classicGlass(
     val ui = LocalUi.current
     val st = style ?: ui.settings.glass
     val onDock = LocalOnDock.current
-    val lift = animateFloatAsState(if (focused) 1f else 0f, animationSpec = LiquidSpring, label = "glassLift")
+    val lift = animateFloatAsState(if (focused) 1f else 0f, animationSpec = GlassSpring, label = "glassLift")
     var pos by remember { mutableStateOf(IntOffset.Zero) }
     val tint = ui.wp.tint
     val screen = ui.size
@@ -244,21 +251,21 @@ private fun Modifier.classicGlass(
                 val cx = ox + w / 2f
                 val cy = oy + h / 2f
                 val bmp = when (st) {
-                    GlassStyle.Liquid -> null
-                    GlassStyle.Normal -> backdrops?.soft
-                    GlassStyle.Frost -> backdrops?.heavy
+                    GlassStyle.Clear -> null
+                    GlassStyle.Tinted -> backdrops?.soft
+                    GlassStyle.Frosted -> backdrops?.heavy
                 }
                 val bm = if (blur && screen.width > 0 && screen.height > 0) bmp else null
                 val sx = if (bm != null) screen.width.toFloat() / bm.width else 1f
                 val sy = if (bm != null) screen.height.toFloat() / bm.height else 1f
 
                 when (st) {
-                    GlassStyle.Liquid -> {
-                        // Only seen for a moment before the wallpaper data is ready; liquidGlass() does the real work.
+                    GlassStyle.Clear -> {
+                        // Only seen for a moment before the wallpaper data is ready; clearGlass() does the real work.
                         drawPath(path, Color.White.copy(alpha = 0.10f + 0.06f * min(p, 1f)))
                         if (onDock) drawPath(path, dockBody)
                     }
-                    GlassStyle.Normal -> {
+                    GlassStyle.Tinted -> {
                         if (bm != null) drawPath(path, backdropBrush(bm, sx, sy, 1f, cx, cy, ox, oy))
                         drawPath(
                             path,
@@ -283,7 +290,7 @@ private fun Modifier.classicGlass(
                             style = Stroke(width = hair),
                         )
                     }
-                    GlassStyle.Frost -> {
+                    GlassStyle.Frosted -> {
                         if (bm != null) drawPath(path, backdropBrush(bm, sx, sy, 1f, cx, cy, ox, oy))
                         drawPath(path, Color.White.copy(alpha = 0.22f + 0.12f * min(p, 1f)))
                         drawPath(path, tint.copy(alpha = 0.22f))
@@ -314,8 +321,8 @@ private fun Modifier.classicGlass(
  * a soft glow, glossy top light and a bright rim that swells in with a spring.
  */
 @Composable
-fun Modifier.liquidFocus(shape: Shape, focused: Boolean): Modifier {
-    val lift = animateFloatAsState(if (focused) 1f else 0f, animationSpec = LiquidSpring, label = "focusLift")
+fun Modifier.focusGlow(shape: Shape, focused: Boolean): Modifier {
+    val lift = animateFloatAsState(if (focused) 1f else 0f, animationSpec = GlassSpring, label = "focusLift")
     return this.drawWithCache {
         val w = size.width
         val h = size.height

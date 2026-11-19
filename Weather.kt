@@ -476,7 +476,7 @@ fun WeatherGlyph(code: Int, isDay: Boolean, size: Dp, modifier: Modifier = Modif
 fun WeatherChip(data: WeatherData?, modifier: Modifier, onClick: () -> Unit) {
     val ui = LocalUi.current
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.08f else 1f, animationSpec = LiquidSpring, label = "chip")
+    val scale by animateFloatAsState(if (focused) 1.08f else 1f, animationSpec = GlassSpring, label = "chip")
     val shape = ui.settings.shape.toBarShape()
     GlassBox(
         modifier

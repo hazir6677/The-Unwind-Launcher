@@ -75,8 +75,8 @@ private fun FolderCard(name: String, apps: List<AppEntry>, modifier: Modifier, o
     val ui = LocalUi.current
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        if (focused) (if (ui.settings.glass == GlassStyle.Liquid) 1.08f else 1.1f) else 1f,
-        animationSpec = LiquidSpring,
+        if (focused) (if (ui.settings.glass == GlassStyle.Clear) 1.08f else 1.1f) else 1f,
+        animationSpec = GlassSpring,
         label = "folder",
     )
     val box = 108.dp

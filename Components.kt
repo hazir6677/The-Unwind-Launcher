@@ -135,8 +135,8 @@ fun FocusBox(
     val ui = LocalUi.current
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        if (focused) (if (ui.settings.glass == GlassStyle.Liquid) 1.06f else 1.1f) else 1f,
-        animationSpec = LiquidSpring,
+        if (focused) (if (ui.settings.glass == GlassStyle.Clear) 1.06f else 1.1f) else 1f,
+        animationSpec = GlassSpring,
         label = "focusBox",
     )
     Box(
@@ -144,7 +144,7 @@ fun FocusBox(
             .size(size)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .then(if (selected) Modifier.background(ui.wp.accent, shape) else Modifier)
-            .liquidFocus(shape, focused)
+            .focusGlow(shape, focused)
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) Sfx.move() }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -212,8 +212,8 @@ fun Tile(
     var focused by remember { mutableStateOf(false) }
     var longFired by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        if (focused) (if (ui.settings.glass == GlassStyle.Liquid) 1.08f else 1.14f) else 1f,
-        animationSpec = LiquidSpring,
+        if (focused) (if (ui.settings.glass == GlassStyle.Clear) 1.08f else 1.14f) else 1f,
+        animationSpec = GlassSpring,
         label = "tile",
     )
     val d = 76.dp
@@ -354,7 +354,7 @@ fun Rail(
     val btn = 54.dp
     val gap = 10.dp
     val padV = 12.dp
-    val liquid = ui.settings.glass == GlassStyle.Liquid
+    val clearStyle = ui.settings.glass == GlassStyle.Clear
     // the highlight is one blob that slides (and slightly overshoots) to the current page
     val slide by animateFloatAsState(
         selected.toFloat(),
@@ -369,7 +369,7 @@ fun Rail(
                 .size(btn)
                 .graphicsLayer {
                     // gel: while the blob travels it stretches along its path, then settles (and squashes on overshoot)
-                    if (liquid) {
+                    if (clearStyle) {
                         val far = kotlin.math.min(1f, kotlin.math.abs(slide - selected))
                         scaleY = 1f + 0.38f * far
                         scaleX = 1f - 0.14f * far
@@ -489,7 +489,7 @@ fun PopupRow(
                     Modifier
                 },
             )
-            .liquidFocus(shape, focused)
+            .focusGlow(shape, focused)
             .onFocusChanged { focused = it.isFocused; if (it.isFocused) Sfx.move() }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },

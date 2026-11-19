@@ -21,28 +21,28 @@ I run it on a 55-inch Xiaomi TV, so that's where most of the testing happened.
 
 ## Screenshots
 
-Same home screen, two wallpapers, two glass styles. The colors change on their own when the wallpaper does.
+Same home screen, two wallpapers, two tint styles. The colors change on their own when the wallpaper does.
 
 &lt;table&gt;
   &lt;tr&gt;
-    &lt;td&gt;&lt;img src=&quot;shot_home_liquid_green.png&quot; alt=&quot;Liquid Glass, green wallpaper&quot;&gt;&lt;/td&gt;
-    &lt;td&gt;&lt;img src=&quot;shot_home_normal_green.png&quot; alt=&quot;Normal glass, green wallpaper&quot;&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;img src=&quot;shot_home_liquid_green.png&quot; alt=&quot;Clear, green wallpaper&quot;&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;img src=&quot;shot_home_normal_green.png&quot; alt=&quot;Tinted, green wallpaper&quot;&gt;&lt;/td&gt;
   &lt;/tr&gt;
   &lt;tr&gt;
-    &lt;td align=&quot;center&quot;&gt;Liquid Glass, Misty Valley wallpaper&lt;/td&gt;
-    &lt;td align=&quot;center&quot;&gt;Normal glass, Misty Valley wallpaper&lt;/td&gt;
+    &lt;td align=&quot;center&quot;&gt;Clear, Misty Valley wallpaper&lt;/td&gt;
+    &lt;td align=&quot;center&quot;&gt;Tinted, Misty Valley wallpaper&lt;/td&gt;
   &lt;/tr&gt;
   &lt;tr&gt;
-    &lt;td&gt;&lt;img src=&quot;shot_home_liquid_amber.png&quot; alt=&quot;Liquid Glass, amber wallpaper&quot;&gt;&lt;/td&gt;
-    &lt;td&gt;&lt;img src=&quot;Tinted%20homescreen%20with%20weather.jpg&quot; alt=&quot;Normal glass with weather chip&quot;&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;img src=&quot;shot_home_liquid_amber.png&quot; alt=&quot;Clear, amber wallpaper&quot;&gt;&lt;/td&gt;
+    &lt;td&gt;&lt;img src=&quot;Tinted%20homescreen%20with%20weather.jpg&quot; alt=&quot;Tinted with weather chip&quot;&gt;&lt;/td&gt;
   &lt;/tr&gt;
   &lt;tr&gt;
-    &lt;td align=&quot;center&quot;&gt;Liquid Glass, my own photo&lt;/td&gt;
-    &lt;td align=&quot;center&quot;&gt;Normal glass with the weather chip&lt;/td&gt;
+    &lt;td align=&quot;center&quot;&gt;Clear, my own photo&lt;/td&gt;
+    &lt;td align=&quot;center&quot;&gt;Tinted with the weather chip&lt;/td&gt;
   &lt;/tr&gt;
 &lt;/table&gt;
 
-App folders in the app drawer, and the Preferences page where you pick the wallpaper, color theme and glass style:
+App folders in the app drawer, and the Preferences page where you pick the wallpaper, color theme and tint style:
 
 &lt;table&gt;
   &lt;tr&gt;
@@ -51,13 +51,13 @@ App folders in the app drawer, and the Preferences page where you pick the wallp
   &lt;/tr&gt;
   &lt;tr&gt;
     &lt;td align=&quot;center&quot;&gt;App folders in the app drawer&lt;/td&gt;
-    &lt;td align=&quot;center&quot;&gt;Preferences: wallpaper, color theme and glass style&lt;/td&gt;
+    &lt;td align=&quot;center&quot;&gt;Preferences: wallpaper, color theme and tint style&lt;/td&gt;
   &lt;/tr&gt;
 &lt;/table&gt;
 
 ## What you get
 
-There are three glass styles: Liquid Glass, Normal and Frost Glass. Normal is a tinted, softly blurred panel. Frost Glass is a heavier, milkier blur. Liquid Glass is the fancy one. It bends the wallpaper at the edges the way a real piece of glass would, adds a bit of edge light and a rainbow fringe, and swells with a springy motion when you focus on it.
+There are three tint styles: Clear, Tinted and Frosted. Tinted is a softly blurred panel. Frosted is a heavier, milkier blur. Clear is see-through: it shows the wallpaper behind it, bends it slightly toward the edge, adds a thin edge light, and swells with a springy motion when you focus on it.
 
 For wallpapers you can use one of the six that come with it, the daily wallpaper, or your own picture from the TV or a USB drive. Each wallpaper gives you three color themes: Soft (lighter, pastel shades), Vivid (brighter, punchier shades) and Mixed (a balance of both).
 
@@ -73,7 +73,7 @@ Day to day:
 - The weather chip opens current conditions and a 5-day outlook from [Open-Meteo](https://open-meteo.com/). It finds your city automatically or lets you search for one, and switches between Celsius and Fahrenheit.
 - The top bar has system settings, a list of every nearby Wi-Fi network (with signal strength and band), TV inputs, the clock, and your Google account.
 - The D-pad moves between the dock, the weather chip, the top bar and your apps, in both directions.
-- Home layout is your call: one endless row that scrolls sideways, or rows that fill the screen width and then wrap below. Either way you can turn on a glass dock behind the first row, in whichever glass style you picked, and set how low the dock sits on the screen.
+- Home layout is your call: one endless row that scrolls sideways, or rows that fill the screen width and then wrap below. Either way you can turn on a glass dock behind the first row, in whichever tint style you picked, and set how low the dock sits on the screen.
 - The greeting on Home (the "Time to unwind" bit) can be rewritten for morning, afternoon, evening and night from Preferences.
 - A short welcome screen shows the first time Unwind opens. You can replay it from the bottom of Preferences.
 
@@ -111,7 +111,7 @@ The pill in the top right has the same search shortcut, a gear for Android syste
 
 - Wallpaper: Daily wallpaper, My photo, or one of the six stock wallpapers
 - Color theme: Soft, Vivid, Mixed
-- Glass style: Liquid Glass, Normal, Frost Glass
+- Tint style: Clear, Tinted, Frosted
 - Icon shape: Circle, Squircle, Rounded, Hexagon
 - Icon style: Themed or Original
 - Home layout: Endless row or Stacked rows
@@ -135,7 +135,7 @@ Daily wallpaper and weather both need internet. They check when the launcher ope
 
 ## How it works
 
-**Glass.** Each wallpaper is blurred ahead of time at three strengths and cut to the shape of whatever's being drawn. Normal and Frost just draw the matching blurred slice behind a tint. Liquid Glass stacks six thin lens bands. The outer rim pulls in wallpaper from outside the shape, which is what the edge of a real glass does. Each band further in does a little less of that, and the center magnifies slightly. It's all anti-aliased paths, so edges stay smooth as things scale.
+**Panels.** Each wallpaper is blurred ahead of time at three strengths and cut to the shape of whatever is being drawn. Tinted and Frosted draw the matching blurred slice behind a tint. Clear draws a lightly blurred slice, then two thin bands near the edge that pull in a little more of the wallpaper from outside the shape (what the edge of a lens does), a thin rim and a soft shadow. It is all GPU paths and gradients with nothing calculated per pixel, so panels appear instantly and edges stay smooth as things scale.
 
 **Icons.** Modern Android icons come in layers, and the foreground layer is what gets used (keeping lighter and darker tones on multicolored logos so they don't turn into a flat blob). Older icons are analyzed by color, including logos sitting on a tile inside the icon. The logo is shrunk in halves down to the size it's shown at, which avoids jagged edges on a big screen.
 

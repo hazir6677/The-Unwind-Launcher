@@ -48,8 +48,12 @@ enum class UpPhase { Idle, Checking, UpToDate, Available, Downloading, Ready, Fa
 
 class UpdateUi(
     val phase: UpPhase = UpPhase.Idle,
+    /** Installed version, read from this app's own package info on the device. Never comes from GitHub. */
     val current: String = "",
+    /** A newer release that can be downloaded (null when you are up to date). */
     val release: ReleaseInfo? = null,
+    /** The newest published release on GitHub, whatever its relation to the installed version (null until a check succeeds). */
+    val latest: ReleaseInfo? = null,
     val file: File? = null,
     val error: String = "",
     val checkedAt: Long = 0L,
@@ -59,12 +63,13 @@ class UpdateUi(
     fun copy(
         phase: UpPhase = this.phase,
         release: ReleaseInfo? = this.release,
+        latest: ReleaseInfo? = this.latest,
         file: File? = this.file,
         error: String = this.error,
         checkedAt: Long = this.checkedAt,
         needsPermission: Boolean = this.needsPermission,
         installing: Boolean = this.installing,
-    ) = UpdateUi(phase, current, release, file, error, checkedAt, needsPermission, installing)
+    ) = UpdateUi(phase, current, release, latest, file, error, checkedAt, needsPermission, installing)
 }
 
 // ---------- Versions ----------
@@ -89,9 +94,44 @@ fun isNewer(remote: String, local: String): Boolean {
 
 // ---------- Talking to GitHub ----------
 
-/** The newest published release that has an APK attached, or null if there isn't one yet. */
-private fun fetchLatestRelease(): ReleaseInfo? {
-    val c = URL("https://api.github.com/repos/$UPDATE_REPO/releases/latest").openConnection() as HttpURLConnection
+/** How a published GitHub release compares with the installed version. */
+enum class Relation { Newer, Same, Ahead }
+
+fun relationOf(remote: String, local: String): Relation = when {
+    isNewer(remote, local) -> Relation.Newer
+    isNewer(local, remote) -> Relation.Ahead
+    else -> Relation.Same
+}
+
+/** Turns a GitHub release's markdown body into plain lines for the TV (also used by What's New). */
+fun tidyNotes(body: String): String =
+    body.replace("\r", "").replace(Regex("(?m)^#+\\s*"), "").replace(Regex("[*`>_]"), "").replace(Regex("\n{3,}"), "\n\n").trim()
+
+private fun releaseFromJson(j: JSONObject): ReleaseInfo? {
+    val tag = j.optString("tag_name")
+    if (tag.isBlank()) return null
+    // the download is optional here: the version number is shown even before the build has attached its APK
+    var apk: JSONObject? = null
+    val assets = j.optJSONArray("assets")
+    if (assets != null) {
+        for (i in 0 until assets.length()) {
+            val a = assets.getJSONObject(i)
+            val name = a.optString("name").lowercase()
+            if (!name.endsWith(".apk")) continue
+            if (apk == null || (apk.optString("name").lowercase().contains("debug") && !name.contains("debug"))) apk = a
+        }
+    }
+    return ReleaseInfo(
+        version = tag.trimStart('v', 'V'),
+        notes = tidyNotes(j.optString("body")),
+        apkUrl = apk?.optString("browser_download_url").orEmpty(),
+        size = apk?.optLong("size", 0L) ?: 0L,
+        published = j.optString("published_at"),
+    )
+}
+
+private fun getJson(url: String): JSONObject? {
+    val c = URL(url).openConnection() as HttpURLConnection
     c.connectTimeout = 10_000
     c.readTimeout = 15_000
     c.setRequestProperty("Accept", "application/vnd.github+json")
@@ -103,29 +143,24 @@ private fun fetchLatestRelease(): ReleaseInfo? {
             403, 429 -> throw IllegalStateException("GitHub asked us to slow down. Try again in a little while.")
             else -> throw IllegalStateException("GitHub answered with error ${c.responseCode}.")
         }
-        val j = JSONObject(c.inputStream.bufferedReader().use { it.readText() })
-        val tag = j.optString("tag_name")
-        if (tag.isBlank()) return null
-        val assets = j.optJSONArray("assets") ?: return null
-        var apk: JSONObject? = null
-        for (i in 0 until assets.length()) {
-            val a = assets.getJSONObject(i)
-            val name = a.optString("name").lowercase()
-            if (!name.endsWith(".apk")) continue
-            if (apk == null || (apk.optString("name").lowercase().contains("debug") && !name.contains("debug"))) apk = a
-        }
-        if (apk == null) return null
-        val notes = j.optString("body").replace(Regex("[#*`>_]"), "").replace(Regex("\n{3,}"), "\n\n").trim()
-        return ReleaseInfo(
-            version = tag.trimStart('v', 'V'),
-            notes = notes.take(700),
-            apkUrl = apk.getString("browser_download_url"),
-            size = apk.optLong("size", 0L),
-            published = j.optString("published_at"),
-        )
+        return JSONObject(c.inputStream.bufferedReader().use { it.readText() })
     } finally {
         c.disconnect()
     }
+}
+
+/** The latest published release (GitHub's own "latest" on the Releases page), or null if there is none yet. */
+private fun fetchLatestRelease(): ReleaseInfo? =
+    getJson("https://api.github.com/repos/$UPDATE_REPO/releases/latest")?.let(::releaseFromJson)
+
+/** The release published under the tag of the installed version (v2.4 or 2.4), or null if that build was never published. */
+fun fetchReleaseNotesFor(version: String): String? {
+    for (tag in listOf("v$version", version)) {
+        val j = runCatching { getJson("https://api.github.com/repos/$UPDATE_REPO/releases/tags/$tag") }.getOrNull() ?: continue
+        val notes = tidyNotes(j.optString("body"))
+        if (notes.isNotBlank()) return notes
+    }
+    return null
 }
 
 private fun updatesDir(ctx: Context) = File(ctx.cacheDir, "updates")
@@ -277,15 +312,16 @@ class UpdateController(
             val now = System.currentTimeMillis()
             r.onSuccess { rel ->
                 prefs.edit().putLong(K_LAST_CHECK, now).apply()
-                if (rel != null && isNewer(rel.version, ui.current)) {
+                // the installed version (ui.current) and the published one (rel) come from different places and are compared here
+                if (rel != null && rel.apkUrl.isNotBlank() && isNewer(rel.version, ui.current)) {
                     val f = withContext(Dispatchers.IO) { cachedApk(ctx, rel) }
                     progress = if (f != null) 1f else 0f
                     ui = ui.copy(
                         phase = if (f != null) UpPhase.Ready else UpPhase.Available,
-                        release = rel, file = f, checkedAt = now, error = "",
+                        release = rel, latest = rel, file = f, checkedAt = now, error = "",
                     )
                 } else {
-                    ui = ui.copy(phase = UpPhase.UpToDate, release = null, file = null, checkedAt = now, error = "")
+                    ui = ui.copy(phase = UpPhase.UpToDate, release = null, latest = rel, file = null, checkedAt = now, error = "")
                 }
             }
             r.onFailure { e ->

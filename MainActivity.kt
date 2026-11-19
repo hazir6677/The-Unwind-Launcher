@@ -144,6 +144,13 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     var moveApp by remember { mutableStateOf<AppEntry?>(null) }
     val moveFocus = remember { FocusRequester() }
     var prefTab by remember { mutableStateOf(PrefTab.Look) }
+    // Preferences remembers which card had focus, so coming back from a sub-screen lands on it again
+    val prefRows = remember { PrefRows() }
+    var prefRestore by remember { mutableStateOf(false) }
+    // What's New pop-up: the notes for the installed version only
+    var notesOpen by remember { mutableStateOf(false) }
+    var wasNotesOpen by remember { mutableStateOf(false) }
+    var notes by remember { mutableStateOf<NotesUi?>(null) }
     val updater = remember { UpdateController(ctx.applicationContext, scope, prefs) }
     var backups by remember { mutableStateOf(Backup.list(ctx)) }
     var backupStatus by remember { mutableStateOf("") }
@@ -190,6 +197,7 @@ fun LauncherApp(tick: Int, homeTick: Int) {
             if (ok) {
                 updateSettings(settings.copy(wallSource = WallSource.Custom))
                 wallVersion++
+                prefRestore = true
                 screen = Screen.Settings
             } else {
                 Toast.makeText(ctx, "Couldn't open that picture", Toast.LENGTH_SHORT).show()
@@ -309,8 +317,7 @@ fun LauncherApp(tick: Int, homeTick: Int) {
             val aspect = rootSize.width.toFloat() / rootSize.height
             // same scrim strength the launcher draws over the wallpaper, so the glass sees what is really behind it
             val sa = (0.45f + 0.35f * w.wp.luma).coerceIn(0.45f, 0.85f)
-            val sw = rootSize.width
-            backdrops = withContext(Dispatchers.Default) { makeBackdrops(w.bitmap, aspect, sa, sw) }
+            backdrops = withContext(Dispatchers.Default) { makeBackdrops(w.bitmap, aspect, sa) }
         }
     }
     // Bing image of the day: check when opened and then every half hour while the launcher is up
@@ -416,8 +423,29 @@ fun LauncherApp(tick: Int, homeTick: Int) {
         focusKick++
     }
 
+    fun openWhatsNew() {
+        notes = null
+        notesOpen = true
+        scope.launch { notes = loadNotes(ctx.applicationContext, updater.ui.current) }
+    }
+    // After the pop-up closes, the highlight goes back to the What's New button
+    LaunchedEffect(notesOpen) {
+        if (notesOpen) {
+            wasNotesOpen = true
+        } else if (wasNotesOpen) {
+            wasNotesOpen = false
+            delay(150)
+            runCatching { prefRows.at(prefRows.lastRow, prefRows.lastCol)?.requestFocus() }
+        }
+    }
+
     BackHandler(enabled = screen != Screen.Home) {
-        screen = if (screen == Screen.Gallery || screen == Screen.Greeting) Screen.Settings else Screen.Home
+        if (screen == Screen.Gallery || screen == Screen.Greeting) {
+            prefRestore = true
+            screen = Screen.Settings
+        } else {
+            screen = Screen.Home
+        }
     }
     // Inside a folder, Back goes to the folder list first
     BackHandler(enabled = screen == Screen.Apps && openFolder != null && settings.appsView == AppsView.Folders) {
@@ -440,7 +468,8 @@ fun LauncherApp(tick: Int, homeTick: Int) {
         moveApp = null
     }
 
-    val ui = UiCtx(settings, wp, backdrops, rootSize)
+    // One UiCtx per real change. A new object on every recomposition would make every panel and card in the app redraw.
+    val ui = remember(settings, wp, backdrops, rootSize) { UiCtx(settings, wp, backdrops, rootSize) }
     val railSel = when (screen) {
         Screen.Home -> 0
         Screen.Search -> 1
@@ -460,7 +489,7 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     Box(Modifier.fillMaxSize().background(Color.Black).onSizeChanged { rootSize = it }) {
         CompositionLocalProvider(LocalUi provides ui) {
             // While a popup is open, nothing behind it can take focus.
-            Box(Modifier.fillMaxSize().focusProperties { canFocus = popup == Popup.None && !showIntro && moveApp == null }) {
+            Box(Modifier.fillMaxSize().focusProperties { canFocus = popup == Popup.None && !showIntro && moveApp == null && !notesOpen }) {
                 WallpaperLayer(wall)
                 // Soft scrims keep text readable on any wallpaper (stronger on bright pictures)
                 Box(
@@ -511,6 +540,9 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                         nav = nav,
                         wallVersion = wallVersion,
                         wallStatus = wallStatus,
+                        rows = prefRows,
+                        restore = prefRestore,
+                        onWhatsNew = { openWhatsNew() },
                         onChange = { updateSettings(it) },
                         onPickCustom = {
                             if (customFile(ctx).exists() && settings.wallSource != WallSource.Custom) {
@@ -537,9 +569,10 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                         nav = nav,
                         onSave = { g ->
                             updateSettings(settings.copy(greetings = settings.greetings + (greetPart to g)))
+                            prefRestore = true
                             screen = Screen.Settings
                         },
-                        onCancel = { screen = Screen.Settings },
+                        onCancel = { prefRestore = true; screen = Screen.Settings },
                     )
                     Screen.Gallery -> GalleryScreen(
                         items = gallery,
@@ -596,7 +629,7 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                             0 -> screen = Screen.Home
                             1 -> screen = Screen.Search
                             2 -> screen = Screen.Apps
-                            3 -> screen = Screen.Settings
+                            3 -> { prefRestore = false; screen = Screen.Settings }
                             else -> {}
                         }
                     },
@@ -665,6 +698,10 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                     onAuto = { moveTo(a, null) },
                     onDismiss = { moveApp = null },
                 )
+            }
+
+            if (notesOpen) {
+                WhatsNewPopup(version = updater.ui.current, notes = notes, onClose = { notesOpen = false })
             }
 
             // The intro animates itself in and out (see Intro.kt), so no wrapper fade here

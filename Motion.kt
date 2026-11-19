@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -47,5 +48,7 @@ fun Modifier.bounceIn(key: Any, rise: Dp = 18.dp): Modifier {
         scaleX = s
         scaleY = s
         translationY = (1f - v) * rise.toPx()
+        // fade the glyphs and shapes directly; the default would render the whole screen into an extra buffer every frame
+        compositingStrategy = CompositingStrategy.ModulateAlpha
     }
 }

@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,6 +45,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -53,6 +59,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -68,8 +75,9 @@ enum class PrefTab(val label: String, val w: Dp) {
 }
 
 @Composable
-fun PrefTabBar(tab: PrefTab, onTab: (PrefTab) -> Unit, nav: Nav, updateBadge: Boolean) {
+fun PrefTabBar(tab: PrefTab, onTab: (PrefTab) -> Unit, nav: Nav, updateBadge: Boolean, rows: PrefRows) {
     val ui = LocalUi.current
+    val scope = rememberCoroutineScope()
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         PrefTab.values().forEachIndexed { i, t ->
             // the open tab is where focus lands when Preferences opens or you come back from the rail
@@ -78,7 +86,22 @@ fun PrefTabBar(tab: PrefTab, onTab: (PrefTab) -> Unit, nav: Nav, updateBadge: Bo
                 selected = t == tab,
                 w = t.w,
                 h = 44.dp,
-                modifier = base.dpad(left = if (i == 0) nav.rail else null, up = nav.pill),
+                modifier = base
+                    .dpad(left = if (i == 0) nav.rail else null, up = nav.pill)
+                    .onPreviewKeyEvent { e ->
+                        // Down goes into the page below. From a tab that isn't open yet, that tab opens first.
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) {
+                            val switching = t != tab
+                            if (switching) onTab(t)
+                            scope.launch {
+                                delay(if (switching) 160 else 0)
+                                runCatching { rows.first()?.requestFocus() }
+                            }
+                            true
+                        } else {
+                            false
+                        }
+                    },
                 onClick = { onTab(t) },
             ) {
                 Row(
@@ -101,7 +124,7 @@ fun PrefTabBar(tab: PrefTab, onTab: (PrefTab) -> Unit, nav: Nav, updateBadge: Bo
 @Composable
 fun ReadCard(modifier: Modifier = Modifier, width: Dp = 700.dp, content: @Composable ColumnScope.() -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.012f else 1f, animationSpec = LiquidSpring, label = "read")
+    val scale by animateFloatAsState(if (focused) 1.012f else 1f, animationSpec = GlassSpring, label = "read")
     GlassBox(
         modifier
             .width(width)
@@ -156,9 +179,7 @@ private fun Command(text: String) {
 // ---------- Sound & motion ----------
 
 @Composable
-fun FeelTab(settings: LauncherSettings, nav: Nav, onChange: (LauncherSettings) -> Unit) {
-    val first = Modifier.dpad(left = nav.rail, up = nav.content)
-    val upOnly = Modifier.dpad(up = nav.content)
+fun FeelTab(settings: LauncherSettings, nav: Nav, rows: PrefRows, onChange: (LauncherSettings) -> Unit) {
 
     SectionTitle("Move sounds", "A tiny nature sound each time the highlight moves. Press OK on one to hear it.")
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -167,7 +188,7 @@ fun FeelTab(settings: LauncherSettings, nav: Nav, onChange: (LauncherSettings) -
                 selected = settings.soundPack == p,
                 w = 150.dp,
                 h = 68.dp,
-                modifier = if (i == 0) first else upOnly,
+                modifier = Modifier.prefItem(rows, nav, 0, i),
                 onClick = {
                     Sfx.play(p, settings.soundVolume.gain)
                     onChange(settings.copy(soundPack = p))
@@ -189,7 +210,7 @@ fun FeelTab(settings: LauncherSettings, nav: Nav, onChange: (LauncherSettings) -
                 selected = settings.soundVolume == v,
                 w = 150.dp,
                 h = 56.dp,
-                modifier = if (i == 0) Modifier.dpad(left = nav.rail) else Modifier,
+                modifier = Modifier.prefItem(rows, nav, 1, i),
                 onClick = {
                     Sfx.play(if (settings.soundPack == SoundPack.Off) SoundPack.Droplet else settings.soundPack, v.gain)
                     onChange(settings.copy(soundVolume = v))
@@ -202,7 +223,7 @@ fun FeelTab(settings: LauncherSettings, nav: Nav, onChange: (LauncherSettings) -
     Spacer(Modifier.height(24.dp))
 
     SectionTitle("Bouncy motion", "Icons, cards and pages spring and settle as you move. Turn off for plain, smooth movement.")
-    ToggleCard(if (settings.bouncy) "Bouncy motion on" else "Bouncy motion off", settings.bouncy, Modifier.dpad(left = nav.rail)) {
+    ToggleCard(if (settings.bouncy) "Bouncy motion on" else "Bouncy motion off", settings.bouncy, Modifier.prefItem(rows, nav, 2)) {
         onChange(settings.copy(bouncy = !settings.bouncy))
     }
 }
@@ -215,26 +236,25 @@ private fun fileSize(bytes: Long): String =
 @Composable
 fun BackupTab(
     nav: Nav,
+    rows: PrefRows,
     backups: List<File>,
     status: String,
     onSave: () -> Unit,
     onRestore: () -> Unit,
     onRestoreFile: (File) -> Unit,
 ) {
-    val first = Modifier.dpad(left = nav.rail, up = nav.content)
-    val toRail = Modifier.dpad(left = nav.rail)
     var armed by remember { mutableStateOf<String?>(null) }
     val fmt = remember { SimpleDateFormat("MMM d, yyyy  h:mm a", Locale.getDefault()) }
 
     SectionTitle(
         "Save your setup",
-        "Home apps and their order, folders, theme, glass, shapes, wallpaper, greetings, weather, sound and motion go into one file",
+        "Home apps and their order, folders, theme, tint style, shapes, wallpaper, greetings, weather, sound and motion go into one file",
     )
-    ActionCard("Save setup to a file", first, 300.dp, onSave)
+    ActionCard("Save setup to a file", Modifier.prefItem(rows, nav, 0), 300.dp, onSave)
     Spacer(Modifier.height(24.dp))
 
     SectionTitle("Restore a setup", "Puts everything back as it was saved. Unwind restarts when it's done.")
-    ActionCard("Restore from a file", toRail, 300.dp, onRestore)
+    ActionCard("Restore from a file", Modifier.prefItem(rows, nav, 1), 300.dp, onRestore)
     if (status.isNotBlank()) {
         Spacer(Modifier.height(10.dp))
         Text(status, color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.width(560.dp))
@@ -243,13 +263,13 @@ fun BackupTab(
     if (backups.isNotEmpty()) {
         Spacer(Modifier.height(24.dp))
         SectionTitle("Saved on this TV", "Press OK twice on one to restore it")
-        backups.forEach { f ->
+        backups.forEachIndexed { bi, f ->
             val isArmed = armed == f.name
             OptionCard(
                 selected = isArmed,
                 w = 460.dp,
                 h = 60.dp,
-                modifier = toRail,
+                modifier = Modifier.prefItem(rows, nav, 2 + bi),
                 onClick = { if (isArmed) { armed = null; onRestoreFile(f) } else armed = f.name },
             ) {
                 Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 16.dp)) {
@@ -286,21 +306,29 @@ private fun VersionBlock(label: String, value: String, modifier: Modifier = Modi
 }
 
 @Composable
-fun UpdatesTab(settings: LauncherSettings, nav: Nav, up: UpdateController, onChange: (LauncherSettings) -> Unit) {
+fun UpdatesTab(
+    settings: LauncherSettings,
+    nav: Nav,
+    rows: PrefRows,
+    up: UpdateController,
+    onWhatsNew: () -> Unit,
+    onChange: (LauncherSettings) -> Unit,
+) {
     val ui = LocalUi.current
     val ctx = LocalContext.current
     val s = up.ui
     val rel = s.release
     val canInstall = remember(s.needsPermission, s.phase, s.installing) { canInstallPackages(ctx) }
     val fmt = remember { SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()) }
-    val primary = remember { FocusRequester() }
+    val latest = s.latest
+    val relation = latest?.let { relationOf(it.version, s.current) }
 
     // When the main button changes meaning (check > download > install), keep the highlight on it
     val firstRun = remember { booleanArrayOf(true) }
     LaunchedEffect(s.phase) {
         if (firstRun[0]) { firstRun[0] = false; return@LaunchedEffect }
         delay(120)
-        runCatching { primary.requestFocus() }
+        runCatching { rows.at(0, 0)?.requestFocus() }
     }
 
     SectionTitle("Updates", "Unwind looks for new versions on GitHub and can install them for you")
@@ -317,18 +345,23 @@ fun UpdatesTab(settings: LauncherSettings, nav: Nav, up: UpdateController, onCha
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     Text("\u2192", color = inkFg(Color.White.copy(alpha = 0.7f)), fontSize = 26.sp)
                 }
+                // The right-hand number is always the newest release published on GitHub. It never borrows the installed version.
                 when {
                     rel != null && (s.phase != UpPhase.UpToDate) -> VersionBlock("Next update", "v${rel.version}", accent = true)
-                    s.phase == UpPhase.Checking -> VersionBlock("Next update", "Checking")
-                    s.phase == UpPhase.UpToDate -> VersionBlock("Latest", "v${s.current}")
-                    else -> VersionBlock("Next update", "\u2014")
+                    s.phase == UpPhase.Checking && latest == null -> VersionBlock("Latest", "Checking")
+                    latest != null -> VersionBlock("Latest", "v${latest.version}", accent = relation == Relation.Newer)
+                    else -> VersionBlock("Latest", "\u2014")
                 }
             }
             Spacer(Modifier.height(14.dp))
 
             val line = when {
                 s.phase == UpPhase.Checking -> "Checking GitHub..."
-                s.phase == UpPhase.UpToDate -> "You're on the latest version."
+                s.phase == UpPhase.UpToDate -> when (relation) {
+                    Relation.Ahead -> "You're running v${s.current}, which is newer than the latest published release (v${latest?.version}). This looks like a test build."
+                    Relation.Newer -> "v${latest?.version} is published on GitHub, but its download isn't attached yet. Try again in a few minutes."
+                    else -> "You're on the latest version."
+                }
                 s.phase == UpPhase.Available && rel != null ->
                     "A new version is ready to download" + if (rel.size > 0) " (${fileSize(rel.size)})." else "."
                 s.phase == UpPhase.Downloading -> "Downloading... ${(up.progress * 100).toInt()}%"
@@ -353,7 +386,7 @@ fun UpdatesTab(settings: LauncherSettings, nav: Nav, up: UpdateController, onCha
 
             if (rel != null && rel.notes.isNotBlank() && s.phase != UpPhase.UpToDate) {
                 Spacer(Modifier.height(12.dp))
-                Text("What's new", color = inkAccent(ui.wp.accent), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text("In the new version", color = inkAccent(ui.wp.accent), fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 Text(rel.notes, color = inkFg(Color.White.copy(alpha = 0.9f)), fontSize = 13.sp, lineHeight = 18.sp, maxLines = 6, overflow = TextOverflow.Ellipsis)
             }
 
@@ -375,23 +408,36 @@ fun UpdatesTab(settings: LauncherSettings, nav: Nav, up: UpdateController, onCha
     Spacer(Modifier.height(14.dp))
 
     val busy = s.phase == UpPhase.Checking || s.phase == UpPhase.Downloading || s.installing
-    if (!busy) {
-        val label: String
-        val action: () -> Unit
-        when {
-            s.phase == UpPhase.Available -> { label = "Download update"; action = up::download }
-            s.phase == UpPhase.Ready -> { label = if (canInstall) "Install update" else "Allow installs and update"; action = up::install }
-            s.phase == UpPhase.Failed && rel != null && s.file == null -> { label = "Try the download again"; action = up::download }
-            else -> { label = "Check for updates"; action = { up.check(true) } }
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        var col = 0
+        if (!busy) {
+            val label: String
+            val action: () -> Unit
+            when {
+                s.phase == UpPhase.Available -> { label = "Download update"; action = up::download }
+                s.phase == UpPhase.Ready -> { label = if (canInstall) "Install update" else "Allow installs and update"; action = up::install }
+                s.phase == UpPhase.Failed && rel != null && s.file == null -> { label = "Try the download again"; action = up::download }
+                else -> { label = "Check for updates"; action = { up.check(true) } }
+            }
+            ActionCard(label, Modifier.prefItem(rows, nav, 0, col++), 280.dp, action)
         }
-        ActionCard(label, Modifier.focusRequester(primary).dpad(left = nav.rail, up = nav.content), 280.dp, action)
-        Spacer(Modifier.height(18.dp))
+        // small and quiet next to the main button: what changed in the version installed on this TV
+        OptionCard(
+            selected = false,
+            w = 150.dp,
+            h = 40.dp,
+            modifier = Modifier.prefItem(rows, nav, 0, col++),
+            onClick = onWhatsNew,
+        ) {
+            Text("What's New", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.Center))
+        }
     }
+    Spacer(Modifier.height(18.dp))
 
     ToggleCard(
         if (settings.autoUpdate) "Check automatically: on" else "Check automatically: off",
         settings.autoUpdate,
-        Modifier.dpad(left = nav.rail, up = if (busy) nav.content else null),
+        Modifier.prefItem(rows, nav, 1),
     ) { onChange(settings.copy(autoUpdate = !settings.autoUpdate)) }
     Spacer(Modifier.height(8.dp))
     Text(
@@ -413,16 +459,15 @@ private fun openDeveloperOptions(ctx: Context) {
 }
 
 @Composable
-fun HomeSetupTab(nav: Nav, onOpenHomeSettings: () -> Unit) {
+fun HomeSetupTab(nav: Nav, rows: PrefRows, onOpenHomeSettings: () -> Unit) {
     val ctx = LocalContext.current
     val ip = remember { localIpv4(ctx) }
     val addr = ip ?: "192.168.x.x"
-    val first = Modifier.dpad(left = nav.rail, up = nav.content)
-    val toRail = Modifier.dpad(left = nav.rail)
+    var r = 0 // each card gets the next row, top to bottom
     val gap = Modifier.height(12.dp)
 
     SectionTitle("Make Unwind your Home screen", "So the Home button on your remote opens Unwind")
-    ReadCard(first) {
+    ReadCard(Modifier.prefItem(rows, nav, r++)) {
         GuideStep(1, "Press the Home button on your remote.")
         GuideStep(2, "If the TV asks which Home app to use, pick Unwind, then choose Always.")
         GuideStep(3, "No question? Tap the button below and pick Unwind there.")
@@ -435,32 +480,32 @@ fun HomeSetupTab(nav: Nav, onOpenHomeSettings: () -> Unit) {
         )
     }
     Spacer(Modifier.height(12.dp))
-    ActionCard("Open Home settings", toRail, 240.dp, onOpenHomeSettings)
+    ActionCard("Open Home settings", Modifier.prefItem(rows, nav, r++), 240.dp, onOpenHomeSettings)
     Spacer(Modifier.height(28.dp))
 
     SectionTitle("Didn't work? Set it from a computer", "About 10 minutes. Nothing gets deleted and every step can be undone.")
-    ReadCard(toRail) {
+    ReadCard(Modifier.prefItem(rows, nav, r++)) {
         Body("Some TVs ignore the Home picker and keep opening their own screen. A computer can tell the TV, in plain typed commands, to use Unwind instead.")
         Body("You need: a Windows, Mac or Linux computer on the same Wi-Fi (or network) as the TV. No cables.")
         Body("Use the Up and Down buttons to go through the steps.")
     }
     Spacer(gap)
 
-    StepCard(1, "Turn on Developer options (on the TV)", toRail) {
+    StepCard(1, "Turn on Developer options (on the TV)", Modifier.prefItem(rows, nav, r++)) {
         Body("Open Settings > Device Preferences > About. Move to \"Build\" (on some TVs \"Android TV OS build\") and press OK seven times quickly. A message says you are now a developer.")
         Body("This button tries to jump straight to the right place:")
     }
     Spacer(Modifier.height(8.dp))
-    ActionCard("Open developer settings", toRail, 260.dp) { openDeveloperOptions(ctx) }
+    ActionCard("Open developer settings", Modifier.prefItem(rows, nav, r++), 260.dp) { openDeveloperOptions(ctx) }
     Spacer(gap)
 
-    StepCard(2, "Switch on debugging (on the TV)", toRail) {
+    StepCard(2, "Switch on debugging (on the TV)", Modifier.prefItem(rows, nav, r++)) {
         Body("Go back one step to Settings > Device Preferences > Developer options.")
         Body("Turn on \"USB debugging\" (the name is odd, but it also covers Wi-Fi). On newer TVs (Android 11 and up) you'll see \"Wireless debugging\" instead. Turn that on.")
     }
     Spacer(gap)
 
-    StepCard(3, "Find your TV's address", toRail) {
+    StepCard(3, "Find your TV's address", Modifier.prefItem(rows, nav, r++)) {
         Body("Your computer finds the TV by its address, which is a number like 192.168.1.23. Right now this TV's address is:")
         Command(ip ?: "Not connected. Join Wi-Fi first.")
         Body("You can also find it in Settings > Network & Internet > your network > IP address.")
@@ -468,7 +513,7 @@ fun HomeSetupTab(nav: Nav, onOpenHomeSettings: () -> Unit) {
     }
     Spacer(gap)
 
-    StepCard(4, "Get ADB on your computer", toRail) {
+    StepCard(4, "Get ADB on your computer", Modifier.prefItem(rows, nav, r++)) {
         Body("ADB is a small, free tool from Google that lets a computer talk to the TV. On the computer, search for \"Android platform tools\", open the page on developer.android.com, download the one for your computer and unzip it.")
         Body("Then open a terminal inside that folder:")
         Body("Windows: open the folder, click the address bar at the top, type  cmd  and press Enter.")
@@ -476,7 +521,7 @@ fun HomeSetupTab(nav: Nav, onOpenHomeSettings: () -> Unit) {
     }
     Spacer(gap)
 
-    StepCard(5, "Connect the computer to the TV", toRail) {
+    StepCard(5, "Connect the computer to the TV", Modifier.prefItem(rows, nav, r++)) {
         Body("Most TVs: type this and press Enter.")
         Command("adb connect $addr:5555")
         Body("Newer TVs using Wireless debugging: first pair, using the pairing address and 6-digit code shown on the TV:")
@@ -489,14 +534,14 @@ fun HomeSetupTab(nav: Nav, onOpenHomeSettings: () -> Unit) {
     }
     Spacer(gap)
 
-    StepCard(6, "Tell the TV to use Unwind", toRail) {
+    StepCard(6, "Tell the TV to use Unwind", Modifier.prefItem(rows, nav, r++)) {
         Body("Type this exactly, then press the Home button on the remote.")
         Command("adb shell cmd package set-home-activity com.unwind.launcher/.MainActivity")
         Body("Unwind should open. That's it for most TVs.")
     }
     Spacer(gap)
 
-    StepCard(7, "Still opening the old Home screen?", toRail) {
+    StepCard(7, "Still opening the old Home screen?", Modifier.prefItem(rows, nav, r++)) {
         Body("Find out which app the TV currently treats as Home:")
         Command("adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME")
         Body("The last line looks like  com.something.launcher/.SomeName . The part before the slash is the app's name. Switch that app off (it is not deleted):")
@@ -507,14 +552,14 @@ fun HomeSetupTab(nav: Nav, onOpenHomeSettings: () -> Unit) {
     }
     Spacer(gap)
 
-    StepCard(8, "Finish", toRail) {
+    StepCard(8, "Finish", Modifier.prefItem(rows, nav, r++)) {
         Body("Disconnect when you're done:")
         Command("adb disconnect")
         Body("You can switch debugging off again in Developer options. Unwind stays your Home screen.")
     }
     Spacer(gap)
 
-    StepCard(9, "If something goes wrong", toRail) {
+    StepCard(9, "If something goes wrong", Modifier.prefItem(rows, nav, r++)) {
         Body("\"Can't connect\": the computer and TV must be on the same Wi-Fi, the TV must be awake, and the address may have changed after a restart (check step 3 again).")
         Body("\"adb is not recognized\": the terminal is not open inside the platform-tools folder (step 4).")
         Body("Home button does nothing at all: on the TV there's no Home app left. Run the \"pm enable\" command from step 7.")

@@ -253,7 +253,7 @@ fun AppGrid(
 fun KeyCap(label: String, w: Dp, modifier: Modifier, active: Boolean = false, onClick: () -> Unit) {
     val ui = LocalUi.current
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.08f else 1f, animationSpec = LiquidSpring, label = "key")
+    val scale by animateFloatAsState(if (focused) 1.08f else 1f, animationSpec = GlassSpring, label = "key")
     GlassBox(
         modifier
             .size(w, 38.dp)
@@ -333,7 +333,7 @@ fun OptionCard(
 ) {
     val ui = LocalUi.current
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.05f else 1f, animationSpec = LiquidSpring, label = "option")
+    val scale by animateFloatAsState(if (focused) 1.05f else 1f, animationSpec = GlassSpring, label = "option")
     val shape = RoundedCornerShape(16.dp)
     Box(
         modifier
@@ -436,8 +436,8 @@ fun ToggleCard(label: String, on: Boolean, modifier: Modifier, onClick: () -> Un
                     .clip(RoundedCornerShape(13.dp))
                     .background(if (on) ui.wp.accent else Color.White.copy(alpha = 0.28f)),
             ) {
-                if (ui.settings.glass == GlassStyle.Liquid && ui.backdrops?.liquid != null) {
-                    // In Liquid the thumb is a small glass capsule; its middle stays clear so the track shows through
+                if (ui.settings.glass == GlassStyle.Clear && ui.backdrops?.clear != null) {
+                    // In Clear the thumb is a small see-through capsule; its middle stays clear so the track shows through
                     GlassBox(
                         Modifier.align(if (on) Alignment.CenterEnd else Alignment.CenterStart).padding(2.dp).size(32.dp, 22.dp),
                         RoundedCornerShape(11.dp),
@@ -481,6 +481,14 @@ private fun LayoutGlyph(stacked: Boolean) {
 
 // ---------- Preferences ----------
 
+/** Wallpaper thumbnails kept for the life of the app (they only change when a wallpaper is replaced). */
+private object WallThumbs {
+    var stock: List<ImageBitmap?>? = null
+    var custom: ImageBitmap? = null
+    var bing: ImageBitmap? = null
+    var version: Int = -1
+}
+
 @Composable
 fun SettingsScreen(
     settings: LauncherSettings,
@@ -488,6 +496,9 @@ fun SettingsScreen(
     nav: Nav,
     wallVersion: Int,
     wallStatus: String,
+    rows: PrefRows,
+    restore: Boolean,
+    onWhatsNew: () -> Unit,
     onChange: (LauncherSettings) -> Unit,
     onPickCustom: () -> Unit,
     onOpenHomeSettings: () -> Unit,
@@ -504,60 +515,70 @@ fun SettingsScreen(
 ) {
     val ui = LocalUi.current
     val ctx = LocalContext.current
-    var thumbs by remember { mutableStateOf<List<ImageBitmap?>>(emptyList()) }
-    var customThumb by remember { mutableStateOf<ImageBitmap?>(null) }
-    var bingThumb by remember { mutableStateOf<ImageBitmap?>(null) }
+    // Thumbnails are decoded once and kept, so reopening Preferences doesn't decode six large pictures again
+    var thumbs by remember { mutableStateOf<List<ImageBitmap?>>(WallThumbs.stock ?: emptyList()) }
+    var customThumb by remember { mutableStateOf(WallThumbs.custom) }
+    var bingThumb by remember { mutableStateOf(WallThumbs.bing) }
     LaunchedEffect(Unit) {
-        thumbs = withContext(Dispatchers.IO) { WALLPAPERS.map { decodeRes(ctx, it.key, 4)?.asImageBitmap() } }
+        if (WallThumbs.stock == null) {
+            WallThumbs.stock = withContext(Dispatchers.IO) { WALLPAPERS.map { decodeRes(ctx, it.key, 4)?.asImageBitmap() } }
+        }
+        thumbs = WallThumbs.stock ?: emptyList()
     }
     LaunchedEffect(wallVersion) {
-        val pair = withContext(Dispatchers.IO) {
-            Pair(
-                decodeFileScaled(customFile(ctx), 320, 180)?.asImageBitmap(),
-                decodeFileScaled(bingFile(ctx), 320, 180)?.asImageBitmap(),
-            )
+        if (WallThumbs.version != wallVersion) {
+            val pair = withContext(Dispatchers.IO) {
+                Pair(
+                    decodeFileScaled(customFile(ctx), 320, 180)?.asImageBitmap(),
+                    decodeFileScaled(bingFile(ctx), 320, 180)?.asImageBitmap(),
+                )
+            }
+            WallThumbs.custom = pair.first
+            WallThumbs.bing = pair.second
+            WallThumbs.version = wallVersion
         }
-        customThumb = pair.first
-        bingThumb = pair.second
+        customThumb = WallThumbs.custom
+        bingThumb = WallThumbs.bing
     }
+    // Opening Preferences lands on the open tab. Coming back from a sub-screen (greeting editor, picture list)
+    // puts the highlight back on the card you came from.
     LaunchedEffect(focusKick) {
         delay(200)
-        runCatching { nav.content.requestFocus() }
+        val back = if (restore && rows.lastRow >= 0) rows.at(rows.lastRow, rows.lastCol) else null
+        runCatching { (back ?: nav.content).requestFocus() }
     }
 
     val isBing = settings.wallSource == WallSource.Bing
     val isCustom = settings.wallSource == WallSource.Custom
     val isStock = settings.wallSource == WallSource.Stock
-    val toRail = Modifier.dpad(left = nav.rail)
-
     Column(Modifier.fillMaxSize().padding(start = 150.dp, top = 84.dp, end = 24.dp)) {
-        PrefTabBar(tab, onTab, nav, updater.hasUpdate)
+        PrefTabBar(tab, onTab, nav, updater.hasUpdate, rows)
         Spacer(Modifier.height(16.dp))
         key(tab) {
         Column(Modifier.fillMaxSize().bounceIn(tab, 12.dp).verticalScroll(rememberScrollState()).padding(bottom = 60.dp)) {
         when (tab) {
-        PrefTab.Feel -> FeelTab(settings, nav, onChange)
-        PrefTab.Backup -> BackupTab(nav, backups, backupStatus, onSaveBackup, onRestoreBackup, onRestoreFile)
-        PrefTab.Updates -> UpdatesTab(settings, nav, updater, onChange)
-        PrefTab.Home -> HomeSetupTab(nav, onOpenHomeSettings)
+        PrefTab.Feel -> FeelTab(settings, nav, rows, onChange)
+        PrefTab.Backup -> BackupTab(nav, rows, backups, backupStatus, onSaveBackup, onRestoreBackup, onRestoreFile)
+        PrefTab.Updates -> UpdatesTab(settings, nav, rows, updater, onWhatsNew, onChange)
+        PrefTab.Home -> HomeSetupTab(nav, rows, onOpenHomeSettings)
         PrefTab.Look -> {
         // Wallpaper
-        SectionTitle("Wallpaper", "Icons and glass pick up its colors, whatever picture you choose")
+        SectionTitle("Wallpaper", "Icons and panels pick up its colors, whatever picture you choose")
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             WallCard(
                 "Daily wallpaper", bingThumb, "Daily", isBing,
-                Modifier.dpad(left = nav.rail, up = nav.content),
+                Modifier.prefItem(rows, nav, 0, 0),
             ) { onChange(settings.copy(wallSource = WallSource.Bing)) }
             WallCard(
                 "My photo", customThumb, "+ Choose", isCustom,
-                Modifier.dpad(up = nav.content),
+                Modifier.prefItem(rows, nav, 0, 1),
                 onPickCustom,
             )
             WALLPAPERS.forEachIndexed { i, w ->
                 val sel = isStock && settings.wallpaper == i
                 WallCard(
                     w.name, thumbs.getOrNull(i), "", sel,
-                    Modifier.dpad(up = nav.content),
+                    Modifier.prefItem(rows, nav, 0, 2 + i),
                 ) { onChange(settings.copy(wallSource = WallSource.Stock, wallpaper = i)) }
             }
         }
@@ -579,7 +600,7 @@ fun SettingsScreen(
                     selected = settings.colorTheme == t,
                     w = 200.dp,
                     h = 72.dp,
-                    modifier = if (ci == 0) toRail else Modifier,
+                    modifier = Modifier.prefItem(rows, nav, 1, ci),
                     onClick = { onChange(settings.copy(colorTheme = t)) },
                 ) {
                     Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -595,15 +616,15 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(24.dp))
 
-        // Glass style
-        SectionTitle("Glass style", "How panels, the dock and tiles look")
+        // Tint style
+        SectionTitle("Tint style", "How panels, the dock and tiles look")
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             GlassStyle.values().forEachIndexed { gi, g ->
                 OptionCard(
                     selected = settings.glass == g,
                     w = 160.dp,
                     h = 72.dp,
-                    modifier = if (gi == 0) toRail else Modifier,
+                    modifier = Modifier.prefItem(rows, nav, 2, gi),
                     onClick = { onChange(settings.copy(glass = g)) },
                 ) {
                     GlassBox(Modifier.fillMaxSize(), RoundedCornerShape(16.dp), style = g, contentAlignment = Alignment.Center) {
@@ -626,7 +647,7 @@ fun SettingsScreen(
                         selected = settings.shape == s,
                         w = 84.dp,
                         h = 76.dp,
-                        modifier = if (si == 0) toRail else Modifier,
+                        modifier = Modifier.prefItem(rows, nav, 3, si),
                         onClick = { onChange(settings.copy(shape = s)) },
                     ) {
                         GlassBox(Modifier.align(Alignment.Center).size(46.dp), s.toShape(), strict = false, contentAlignment = Alignment.Center) {
@@ -648,7 +669,7 @@ fun SettingsScreen(
                     selected = settings.iconStyle == st,
                     w = 200.dp,
                     h = 64.dp,
-                    modifier = if (ii == 0) toRail else Modifier,
+                    modifier = Modifier.prefItem(rows, nav, 4, ii),
                     onClick = { onChange(settings.copy(iconStyle = st)) },
                 ) {
                     Column(Modifier.align(Alignment.CenterStart).padding(start = 16.dp)) {
@@ -668,7 +689,7 @@ fun SettingsScreen(
                     selected = settings.homeLayout == l,
                     w = 260.dp,
                     h = 72.dp,
-                    modifier = if (li == 0) toRail else Modifier,
+                    modifier = Modifier.prefItem(rows, nav, 5, li),
                     onClick = { onChange(settings.copy(homeLayout = l)) },
                 ) {
                     Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -685,8 +706,8 @@ fun SettingsScreen(
         Spacer(Modifier.height(24.dp))
 
         // Dock
-        SectionTitle("Dock", "Put the first row on a glass bar, in your chosen glass style")
-        ToggleCard(if (settings.dock) "Dock on" else "Dock off", settings.dock, toRail) {
+        SectionTitle("Dock", "Put the first row on a bar, in your chosen tint style")
+        ToggleCard(if (settings.dock) "Dock on" else "Dock off", settings.dock, Modifier.prefItem(rows, nav, 6)) {
             onChange(settings.copy(dock = !settings.dock))
         }
         Spacer(Modifier.height(24.dp))
@@ -699,7 +720,7 @@ fun SettingsScreen(
                     selected = settings.dockPos == d,
                     w = 140.dp,
                     h = 56.dp,
-                    modifier = if (di == 0) toRail else Modifier,
+                    modifier = Modifier.prefItem(rows, nav, 7, di),
                     onClick = { onChange(settings.copy(dockPos = d)) },
                 ) {
                     Text(
@@ -722,7 +743,7 @@ fun SettingsScreen(
                     selected = settings.appsView == v,
                     w = 260.dp,
                     h = 64.dp,
-                    modifier = if (ai == 0) toRail else Modifier,
+                    modifier = Modifier.prefItem(rows, nav, 8, ai),
                     onClick = { onChange(settings.copy(appsView = v)) },
                 ) {
                     Column(Modifier.align(Alignment.CenterStart).padding(start = 16.dp, end = 10.dp)) {
@@ -736,7 +757,7 @@ fun SettingsScreen(
 
         // App names
         SectionTitle("App names", "Show the name under each icon on Home")
-        ToggleCard(if (settings.showNames) "Names on" else "Names off", settings.showNames, toRail) {
+        ToggleCard(if (settings.showNames) "Names on" else "Names off", settings.showNames, Modifier.prefItem(rows, nav, 9)) {
             onChange(settings.copy(showNames = !settings.showNames))
         }
         Spacer(Modifier.height(24.dp))
@@ -751,7 +772,7 @@ fun SettingsScreen(
                     selected = dp == nowPart,
                     w = 180.dp,
                     h = 84.dp,
-                    modifier = if (gi == 0) toRail else Modifier,
+                    modifier = Modifier.prefItem(rows, nav, 10, gi),
                     onClick = { onEditGreeting(dp) },
                 ) {
                     Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 14.dp)) {
@@ -777,7 +798,7 @@ fun SettingsScreen(
 
         // Welcome screen
         SectionTitle("Welcome screen", "See the intro that shows the first time Unwind opens")
-        ActionCard("Replay welcome screen", toRail, 240.dp, onReplayIntro)
+        ActionCard("Replay welcome screen", Modifier.prefItem(rows, nav, 11), 240.dp, onReplayIntro)
         }
         }
         }

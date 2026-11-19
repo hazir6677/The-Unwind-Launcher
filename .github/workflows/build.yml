@@ -22,6 +22,9 @@ jobs:
           if [ -f proguard-rules.pro ]; then mv proguard-rules.pro app/proguard-rules.pro; fi
           if [ -f strings.xml ]; then mv strings.xml $R/values/; fi
           if [ -f themes.xml ]; then mv themes.xml $R/values/; fi
+          # the one changelog feeds the What's New pop-up in the app and the GitHub release text
+          mkdir -p app/src/main/assets
+          if [ -f CHANGELOG.md ]; then cp CHANGELOG.md app/src/main/assets/changelog.md; fi
           ls -R app | head -80
       - uses: actions/setup-java@v4
         with:
@@ -73,8 +76,16 @@ jobs:
           else
             cp app/build/outputs/apk/debug/app-debug.apk "dist/Unwind-${GITHUB_REF_NAME}.apk"
           fi
+      - name: Release notes from CHANGELOG.md
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          awk -v v="$V" '/^## /{ if (on) exit; t=$0; sub(/^## v?/, "", t); on=(t==v); next } on' CHANGELOG.md > release_notes.md || true
+          if [ ! -s release_notes.md ]; then echo "See CHANGELOG.md for what changed." > release_notes.md; fi
+          cat release_notes.md
       - name: Attach the APK to the GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.apk
+          body_path: release_notes.md

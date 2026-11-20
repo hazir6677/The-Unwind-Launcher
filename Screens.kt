@@ -2,6 +2,7 @@ package com.unwind.launcher
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -54,6 +56,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -69,6 +77,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
@@ -79,35 +88,97 @@ import java.util.Calendar
 // ---------- Home ----------
 
 @Composable
-private fun HomeTile(app: AppEntry?, modifier: Modifier, onLaunch: (AppEntry) -> Unit, onAdd: () -> Unit) {
+private fun HomeTile(
+    app: AppEntry?,
+    modifier: Modifier,
+    lifted: Boolean,
+    onLaunch: (AppEntry) -> Unit,
+    onAdd: () -> Unit,
+    onMenu: (AppEntry) -> Unit,
+    onFocus: () -> Unit,
+) {
     val ui = LocalUi.current
     if (app != null) {
-        Tile(app.label, modifier, onClick = { onLaunch(app) }) { d -> AppGlyph(app, d) }
+        // Holding OK on an app opens its menu (App info, Move, Remove, Uninstall)
+        Tile(
+            app.label,
+            modifier,
+            onClick = { onLaunch(app) },
+            onFocus = onFocus,
+            onLongPress = { onMenu(app) },
+            lifted = lifted,
+        ) { d -> AppGlyph(app, d) }
     } else {
-        Tile("Add apps", modifier, onClick = onAdd) {
+        Tile("Add apps", modifier, onClick = onAdd, onFocus = onFocus) {
             Icon(Icons.Rounded.Add, contentDescription = null, tint = ui.wp.accent, modifier = Modifier.size(34.dp))
         }
     }
 }
 
+/** A line above the row while an app is being carried, so the controls are never a mystery. */
 @Composable
-fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (AppEntry) -> Unit, onAdd: () -> Unit) {
+private fun MoveHint(label: String, stacked: Boolean) {
+    val ui = LocalUi.current
+    Text(
+        "Moving $label  \u00B7  " + (if (stacked) "arrows move it" else "Left and Right move it") + "  \u00B7  OK places it  \u00B7  Back cancels",
+        color = ui.wp.accent,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Medium,
+        style = TextStyle(shadow = Shadow(Color(0x99000000), blurRadius = 10f)),
+    )
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun HomeContent(
+    favApps: List<AppEntry>,
+    weather: WeatherData?,
+    focusKick: Int,
+    nav: Nav,
+    movingPkg: String?,
+    onLaunch: (AppEntry) -> Unit,
+    onAdd: () -> Unit,
+    onMenu: (AppEntry) -> Unit,
+    onMoveTo: (pkg: String, target: String, right: Boolean) -> Unit,
+    onMoveDone: () -> Unit,
+) {
     val ui = LocalUi.current
     val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
     val part = dayPartFor(hour)
     val greeting = ui.settings.greetings[part] ?: DEFAULT_GREETINGS.getValue(part)
-    LaunchedEffect(favApps.size, focusKick) {
+
+    // Each tile can be focused by app, so the highlight can go back to the same app after the menu closes
+    val reqs = remember { HashMap<String, FocusRequester>() }
+    var lastPkg by remember { mutableStateOf<String?>(null) }
+    fun reqFor(i: Int, pkg: String): FocusRequester = if (i == 0) nav.content else reqs.getOrPut(pkg) { FocusRequester() }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(favApps.size, focusKick, movingPkg) {
         delay(200)
-        runCatching { nav.content.requestFocus() }
+        val want = movingPkg ?: lastPkg
+        val i = if (want == null) -1 else favApps.indexOfFirst { it.pkg == want }
+        runCatching { (if (i < 0) nav.content else reqFor(i, want!!)).requestFocus() }
+    }
+    // While carrying an app along a long row, keep it on screen
+    val order = favApps.joinToString(",") { it.pkg }
+    LaunchedEffect(movingPkg, order) {
+        if (movingPkg == null) return@LaunchedEffect
+        val idx = favApps.indexOfFirst { it.pkg == movingPkg }
+        if (idx < 0) return@LaunchedEffect
+        val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == idx }
+        val cut = info == null || info.offset < 0 || info.offset + info.size > listState.layoutInfo.viewportEndOffset
+        if (cut) runCatching { listState.animateScrollToItem((idx - 1).coerceAtLeast(0)) }
     }
 
     val stacked = ui.settings.homeLayout == HomeLayout.Stacked
     val dock = ui.settings.dock
+    val widget = ui.settings.homeWidget
     // The dock takes the icon shape: pill for circles, squarer for squircles/rounded, hexagonal for hexagons
     val dockShape = ui.settings.shape.toBarShape()
     val dockPad = if (ui.settings.shape == IconShape.Hexagon) 30.dp else 18.dp
     // the "Add apps" tile is the last item in the flow
     val items: List<AppEntry?> = favApps + null
+    val movingLabel = favApps.firstOrNull { it.pkg == movingPkg }?.label
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // How many tiles fit across, worked out from the screen so it adapts to any TV
@@ -125,10 +196,41 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
             label = "homeBottom",
         )
 
-        Column(Modifier.fillMaxSize().padding(start = 163.dp, top = topPad, bottom = bottomPad)) {
-            GreetingText(greeting)
+        // While an app is picked up, the arrows carry it and OK puts it down. Everything else is held back.
+        val carry = Modifier.onPreviewKeyEvent { e ->
+            val mv = movingPkg ?: return@onPreviewKeyEvent false
+            val k = e.key
+            val relevant = k == Key.DirectionLeft || k == Key.DirectionRight || k == Key.DirectionUp || k == Key.DirectionDown ||
+                k == Key.DirectionCenter || k == Key.Enter || k == Key.NumPadEnter
+            if (!relevant) return@onPreviewKeyEvent false
+            if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent true
+            val i = favApps.indexOfFirst { it.pkg == mv }
+            fun step(d: Int) {
+                if (i < 0 || d == 0) return
+                val t = (i + d).coerceIn(0, favApps.lastIndex)
+                if (t != i) {
+                    onMoveTo(mv, favApps[t].pkg, t > i)
+                    Sfx.move()
+                }
+            }
+            when (k) {
+                Key.DirectionLeft -> step(-1)
+                Key.DirectionRight -> step(1)
+                Key.DirectionUp -> if (stacked) step(-cols)
+                Key.DirectionDown -> if (stacked) step(cols)
+                else -> if (e.nativeKeyEvent.repeatCount == 0) onMoveDone()
+            }
+            true
+        }
+
+        Column(Modifier.fillMaxSize().then(carry).padding(start = 163.dp, top = topPad, bottom = bottomPad)) {
             if (!stacked) {
-                Spacer(Modifier.weight(1f))
+                // Everything above the row is the widget slot; it takes whatever height is left
+                Box(Modifier.weight(1f).fillMaxWidth()) { HomeWidgetView(widget, greeting, weather) }
+                if (movingLabel != null) {
+                    MoveHint(movingLabel, false)
+                    Spacer(Modifier.height(6.dp))
+                }
                 // Endless row. With the dock on, the glass bar stays put and the apps slide across it.
                 OptGlass(
                     dock,
@@ -137,6 +239,7 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
                 ) {
                     CompositionLocalProvider(LocalOnDock provides dock) {
                     LazyRow(
+                        state = listState,
                         horizontalArrangement = Arrangement.spacedBy(gap),
                         // vertical padding leaves room for the focused tile to swell without being clipped
                         contentPadding = PaddingValues(
@@ -149,10 +252,14 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
                         itemsIndexed(items, key = { _, a -> a?.pkg ?: "__add" }) { i, app ->
                             HomeTile(
                                 app,
-                                (if (i == 0) Modifier.focusRequester(nav.content) else Modifier)
+                                (if (app != null) Modifier.focusRequester(reqFor(i, app.pkg)) else if (i == 0) Modifier.focusRequester(nav.content) else Modifier)
+                                    .animateItemPlacement(spring(dampingRatio = 0.7f, stiffness = 400f, visibilityThreshold = IntOffset.VisibilityThreshold))
                                     .dpad(left = if (i == 0) nav.rail else null, up = nav.pill),
-                                onLaunch,
-                                onAdd,
+                                lifted = app != null && app.pkg == movingPkg,
+                                onLaunch = onLaunch,
+                                onAdd = onAdd,
+                                onMenu = onMenu,
+                                onFocus = { if (app != null) lastPkg = app.pkg },
                             )
                         }
                     }
@@ -161,6 +268,13 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
             } else {
                 // Stacked rows: the first row fills the width, then apps continue in rows below it.
                 // The whole block starts a little to the left so the dock bar and the focus swell have room.
+                if (widget == HomeWidget.Greetings) {
+                    HomeWidgetView(widget, greeting, weather)
+                } else if (widget != HomeWidget.None) {
+                    // other widgets shrink to this fixed slot so the rows keep their room
+                    Box(Modifier.height(150.dp).fillMaxWidth()) { HomeWidgetView(widget, greeting, weather) }
+                }
+                if (movingLabel != null) MoveHint(movingLabel, true)
                 val side = if (dock) dockPad else 14.dp
                 Box(
                     Modifier.weight(1f).fillMaxWidth().offset(x = -side),
@@ -180,13 +294,16 @@ fun HomeContent(favApps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (Ap
                             ) {
                                 CompositionLocalProvider(LocalOnDock provides (ri == 0 && dock)) {
                                 row.forEachIndexed { ci, app ->
-                                    val isFirst = ri == 0 && ci == 0
+                                    val idx = ri * cols + ci
                                     HomeTile(
                                         app,
-                                        (if (isFirst) Modifier.focusRequester(nav.content) else Modifier)
+                                        (if (app != null) Modifier.focusRequester(reqFor(idx, app.pkg)) else if (idx == 0) Modifier.focusRequester(nav.content) else Modifier)
                                             .dpad(left = if (ci == 0) nav.rail else null, up = if (ri == 0) nav.pill else null),
-                                        onLaunch,
-                                        onAdd,
+                                        lifted = app != null && app.pkg == movingPkg,
+                                        onLaunch = onLaunch,
+                                        onAdd = onAdd,
+                                        onMenu = onMenu,
+                                        onFocus = { if (app != null) lastPkg = app.pkg },
                                     )
                                 }
                                 }
@@ -557,6 +674,7 @@ fun SettingsScreen(
         key(tab) {
         Column(Modifier.fillMaxSize().bounceIn(tab, 12.dp).verticalScroll(rememberScrollState()).padding(bottom = 60.dp)) {
         when (tab) {
+        PrefTab.Widgets -> WidgetsTab(settings, nav, rows, onEditGreeting, onChange)
         PrefTab.Feel -> FeelTab(settings, nav, rows, onChange)
         PrefTab.Backup -> BackupTab(nav, rows, backups, backupStatus, onSaveBackup, onRestoreBackup, onRestoreFile)
         PrefTab.Updates -> UpdatesTab(settings, nav, rows, updater, onWhatsNew, onChange)
@@ -762,43 +880,9 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(24.dp))
 
-        // Greetings
-        SectionTitle("Greetings", "Change the words on Home for each part of the day")
-        val nowPart = dayPartFor(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            DayPart.values().forEachIndexed { gi, dp ->
-                val g = settings.greetings[dp] ?: DEFAULT_GREETINGS.getValue(dp)
-                OptionCard(
-                    selected = dp == nowPart,
-                    w = 180.dp,
-                    h = 84.dp,
-                    modifier = Modifier.prefItem(rows, nav, 10, gi),
-                    onClick = { onEditGreeting(dp) },
-                ) {
-                    Column(Modifier.align(Alignment.CenterStart).padding(horizontal = 14.dp)) {
-                        Text(
-                            if (dp == nowPart) "${dp.label} \u00B7 now" else dp.label,
-                            color = ui.wp.accent,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        Text(
-                            "${g.line1} ${g.line2}".trim().ifEmpty { g.top },
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(dp.hours, color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-
         // Welcome screen
         SectionTitle("Welcome screen", "See the intro that shows the first time Unwind opens")
-        ActionCard("Replay welcome screen", Modifier.prefItem(rows, nav, 11), 240.dp, onReplayIntro)
+        ActionCard("Replay welcome screen", Modifier.prefItem(rows, nav, 10), 240.dp, onReplayIntro)
         }
         }
         }

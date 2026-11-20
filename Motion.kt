@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.dp
 object Motion {
     @Volatile var bouncy: Boolean = true
 
+    /** True while the launcher is in the background (set from the activity). The launch animation uses it to tell "an app opened" from "the app failed to open". */
+    @Volatile var paused: Boolean = false
+
     // Lower damping = more wobble. 0.40 overshoots by about a quarter of the move, then settles.
     const val BOUNCE_DAMPING = 0.40f
     const val BOUNCE_STIFFNESS = 300f

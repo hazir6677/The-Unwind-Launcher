@@ -4,6 +4,24 @@ This one file feeds three places, so nothing is written twice: the What's New po
 (the build copies it into the app), the notes on each GitHub release, and the Updates page. Add a new
 `## vX.Y` section at the top for every version. Lines starting with `###` become small headings.
 
+## v2.5
+
+### Hold OK on an app
+- Hold OK on any app in the home row and a small menu opens: App info, Move, Remove from Home and Uninstall.
+- App info opens Android's own page for that app. Uninstall hands it to Android's uninstall screen (apps built into the TV can't be removed, and the menu says so).
+- Move picks the app up. Left and Right carry it along the row (Up and Down too in Stacked rows), OK puts it down, Back cancels. The new order is saved and goes into your backup.
+
+### Home widgets
+- New Preferences tab, Home widget. Pick what sits above your apps.
+- The greeting is now the Unwind Greetings widget. Editing the words works the same, it just lives in the new tab.
+- Month calendar: this month with today marked by a see-through shape that follows your icon shape.
+- Clock: digital or analog. While it is on, the small clock in the top bar hides and the bar closes up.
+- Weather and Date widgets, or Nothing for a clean, minimal home.
+- Every widget is see-through. No panels, just thin type on your wallpaper.
+
+### Smoother app opening
+- Home zooms in a little and fades as an app opens, then eases back when you return. One switch in Sound & motion turns it off.
+
 ## v2.4
 
 ### Faster and lighter

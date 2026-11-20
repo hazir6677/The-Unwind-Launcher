@@ -62,6 +62,18 @@ enum class DockPos(val label: String, val bottom: Int) {
     Lowest("Lowest", 14),
 }
 
+/** What fills the open space above the home row. Every widget is bare (no panel) so the wallpaper stays visible. */
+enum class HomeWidget(val label: String, val blurb: String) {
+    Greetings("Unwind Greetings", "The time-of-day greeting"),
+    None("Nothing", "A minimal home screen"),
+    Calendar("Month calendar", "This month, today circled"),
+    Clock("Clock", "A big digital or analog clock"),
+    Weather("Weather", "Temperature and the next days"),
+    Date("Date", "Today's date, big and calm"),
+}
+
+enum class ClockFace(val label: String) { Digital("Digital"), Analog("Analog") }
+
 /** The four parts of the day that each get their own greeting. */
 enum class DayPart(val label: String, val hours: String) {
     Morning("Morning", "5 AM to 12 PM"),
@@ -214,6 +226,9 @@ data class LauncherSettings(
     val soundPack: SoundPack = SoundPack.Droplet,
     val soundVolume: SoundVolume = SoundVolume.Medium,
     val autoUpdate: Boolean = true,
+    val homeWidget: HomeWidget = HomeWidget.Greetings,
+    val clockFace: ClockFace = ClockFace.Digital,
+    val launchAnim: Boolean = true,
 )
 
 private inline fun <reified T : Enum<T>> parseEnum(s: String?, def: T): T =
@@ -238,6 +253,9 @@ fun loadSettings(ctx: Context): LauncherSettings {
         soundPack = parseEnum(p.getString("soundPack", null), d.soundPack),
         soundVolume = parseEnum(p.getString("soundVolume", null), d.soundVolume),
         autoUpdate = p.getBoolean("autoUpdate", d.autoUpdate),
+        homeWidget = parseEnum(p.getString("homeWidget", null), d.homeWidget),
+        clockFace = parseEnum(p.getString("clockFace", null), d.clockFace),
+        launchAnim = p.getBoolean("launchAnim", d.launchAnim),
         greetings = DayPart.values().associateWith { part ->
             val parts = p.getString("greet_${part.name}", null)?.split(GREET_SEP)
             if (parts != null && parts.size == 3) Greeting(parts[0], parts[1], parts[2])
@@ -263,6 +281,9 @@ fun saveSettings(ctx: Context, s: LauncherSettings) {
         .putString("soundPack", s.soundPack.name)
         .putString("soundVolume", s.soundVolume.name)
         .putBoolean("autoUpdate", s.autoUpdate)
+        .putString("homeWidget", s.homeWidget.name)
+        .putString("clockFace", s.clockFace.name)
+        .putBoolean("launchAnim", s.launchAnim)
         .also { e ->
             // Only greetings you changed are stored, so untouched ones keep following the defaults
             for (part in DayPart.values()) {

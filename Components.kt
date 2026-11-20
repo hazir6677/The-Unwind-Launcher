@@ -206,13 +206,15 @@ fun Tile(
     onFocus: () -> Unit = {},
     forceName: Boolean = false,
     onLongPress: (() -> Unit)? = null,
+    /** True while this app is being carried to a new spot in the home row: it swells and gets an accent ring. */
+    lifted: Boolean = false,
     content: @Composable BoxScope.(Dp) -> Unit,
 ) {
     val ui = LocalUi.current
     var focused by remember { mutableStateOf(false) }
     var longFired by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        if (focused) (if (ui.settings.glass == GlassStyle.Clear) 1.08f else 1.14f) else 1f,
+        if (lifted) 1.26f else if (focused) (if (ui.settings.glass == GlassStyle.Clear) 1.08f else 1.14f) else 1f,
         animationSpec = GlassSpring,
         label = "tile",
     )
@@ -263,7 +265,9 @@ fun Tile(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         GlassBox(
-            Modifier.size(d),
+            Modifier.size(d).then(
+                if (lifted) Modifier.border(3.dp, ui.wp.accent, ui.settings.shape.toShape()) else Modifier,
+            ),
             ui.settings.shape.toShape(),
             focused,
             strict = false,
@@ -421,6 +425,8 @@ fun TopPill(
     onInputs: () -> Unit,
     onAccount: () -> Unit,
     modifier: Modifier,
+    /** False while the Home screen shows the big clock widget, so the time isn't there twice. */
+    showClock: Boolean = true,
 ) {
     val ui = LocalUi.current
     val btn = ui.settings.shape.toShape()
@@ -443,7 +449,7 @@ fun TopPill(
         FocusButton(Icons.Rounded.Settings, 34.dp, btn, modifier = down, onClick = onSystem)
         FocusButton(Icons.Rounded.Wifi, 34.dp, btn, modifier = down, onClick = onWifi)
         FocusButton(Icons.Rounded.SettingsInputHdmi, 34.dp, btn, modifier = down, onClick = onInputs)
-        Text(time, color = inkFg(), fontSize = 15.sp, modifier = Modifier.padding(horizontal = 6.dp))
+        if (showClock) Text(time, color = inkFg(), fontSize = 15.sp, modifier = Modifier.padding(horizontal = 6.dp))
         FocusBox(34.dp, btn, down, onClick = onAccount) {
             Avatar(acct?.photo, acct?.emails?.firstOrNull()?.take(1)?.uppercase() ?: "", 28.dp)
         }

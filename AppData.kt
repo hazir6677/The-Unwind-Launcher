@@ -2,6 +2,8 @@ package com.unwind.launcher
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
@@ -122,6 +124,28 @@ fun launchApp(ctx: Context, app: AppEntry) {
         Toast.makeText(ctx, "Can't open ${app.label}", Toast.LENGTH_SHORT).show()
     }
 }
+
+/** The system's own page for one app: storage, permissions, force stop, clear data. */
+fun openAppInfo(ctx: Context, pkg: String) = tryStart(
+    ctx,
+    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", pkg, null)),
+    Intent(Settings.ACTION_APPLICATION_SETTINGS),
+    Intent(Settings.ACTION_SETTINGS),
+)
+
+/** True for apps that came with the TV and have no update to roll back. Android won't uninstall these. */
+fun isSystemApp(ctx: Context, pkg: String): Boolean = try {
+    val f = ctx.packageManager.getApplicationInfo(pkg, 0).flags
+    (f and ApplicationInfo.FLAG_SYSTEM) != 0 && (f and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0
+} catch (e: Exception) {
+    false
+}
+
+/** Asks Android to uninstall an app. Android shows its own "Do you want to uninstall?" screen. */
+fun uninstallApp(ctx: Context, pkg: String) = tryStart(
+    ctx,
+    Intent(Intent.ACTION_DELETE, Uri.fromParts("package", pkg, null)),
+)
 
 fun openSystemSettings(ctx: Context) = tryStart(ctx, Intent(Settings.ACTION_SETTINGS))
 fun openWifiSettings(ctx: Context) = tryStart(ctx, Intent(Settings.ACTION_WIFI_SETTINGS), Intent(Settings.ACTION_SETTINGS))

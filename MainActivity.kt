@@ -13,6 +13,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
@@ -86,7 +89,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        Motion.paused = false
         resumeTick++
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Motion.paused = true
     }
 }
 
@@ -143,6 +152,12 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     var openFolder by remember { mutableStateOf<String?>(null) }
     var moveApp by remember { mutableStateOf<AppEntry?>(null) }
     val moveFocus = remember { FocusRequester() }
+    // Long-press menu on a home app, and the app currently being carried along the home row
+    var menuApp by remember { mutableStateOf<AppEntry?>(null) }
+    var dockMove by remember { mutableStateOf<String?>(null) }
+    val menuFocus = remember { FocusRequester() }
+    // 0 = Home as normal, 1 = zoomed and faded out while an app opens
+    val launchP = remember { Animatable(0f) }
     var prefTab by remember { mutableStateOf(PrefTab.Look) }
     // Preferences remembers which card had focus, so coming back from a sub-screen lands on it again
     val prefRows = remember { PrefRows() }
@@ -297,10 +312,18 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     }
 
     LaunchedEffect(tick) { apps = withContext(Dispatchers.Default) { loadApps(ctx) } }
+    // Back from an app: ease Home in from the zoomed, faded state
+    LaunchedEffect(tick) {
+        if (launchP.value > 0f) {
+            if (Motion.bouncy) launchP.animateTo(0f, spring(0.62f, 220f)) else launchP.animateTo(0f, tween(240))
+        }
+    }
     LaunchedEffect(homeTick) {
         if (homeTick > 0) {
             screen = Screen.Home
             popup = Popup.None
+            menuApp = null
+            dockMove = null
             focusKick++
         }
     }
@@ -391,6 +414,43 @@ fun LauncherApp(tick: Int, homeTick: Int) {
         prefs.edit().putString("favs", next.joinToString(",")).apply()
     }
 
+    /** Puts [pkg] where [target] is (before it when moving left, after it when moving right) and saves the order. */
+    fun reorderFav(pkg: String, target: String, right: Boolean) {
+        val cur = favPkgs.toMutableList()
+        if (pkg !in cur || target !in cur || pkg == target) return
+        cur.remove(pkg)
+        val ti = cur.indexOf(target)
+        cur.add(if (right) ti + 1 else ti, pkg)
+        saved = cur
+        prefs.edit().putString("favs", cur.joinToString(",")).apply()
+    }
+
+    fun openMenu(app: AppEntry) {
+        menuApp = app
+    }
+
+    fun closeMenu() {
+        menuApp = null
+        focusKick++
+    }
+
+    /**
+     * Opening an app: Home zooms in slightly and fades, then the app starts. Coming back, Home eases in
+     * again (see the effect on [tick] above). If the app never takes over the screen, Home just fades back.
+     */
+    fun openApp(app: AppEntry) {
+        if (!settings.launchAnim || launchP.isRunning) {
+            launchApp(ctx, app)
+            return
+        }
+        scope.launch {
+            launchP.animateTo(1f, tween(170))
+            launchApp(ctx, app)
+            delay(900)
+            if (!Motion.paused) launchP.animateTo(0f, tween(220))
+        }
+    }
+
     fun requestLocation() {
         locationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
     }
@@ -456,9 +516,13 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     // When Unwind is the Home app, Back on the Home page does nothing (it shouldn't close the launcher)
     BackHandler(enabled = isHome && screen == Screen.Home && popup == Popup.None) { }
     BackHandler(enabled = popup != Popup.None) { closePopup() }
+    // Newest handlers win: Back first cancels a move in progress, then closes the long-press menu
+    BackHandler(enabled = menuApp != null) { closeMenu() }
+    BackHandler(enabled = dockMove != null) { dockMove = null }
 
     LaunchedEffect(screen) {
         if (screen != Screen.Apps) openFolder = null
+        if (screen != Screen.Home) dockMove = null
     }
 
     fun moveTo(app: AppEntry, folder: String?) {
@@ -489,7 +553,14 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     Box(Modifier.fillMaxSize().background(Color.Black).onSizeChanged { rootSize = it }) {
         CompositionLocalProvider(LocalUi provides ui) {
             // While a popup is open, nothing behind it can take focus.
-            Box(Modifier.fillMaxSize().focusProperties { canFocus = popup == Popup.None && !showIntro && moveApp == null && !notesOpen }) {
+            Box(Modifier.fillMaxSize().focusProperties { canFocus = popup == Popup.None && !showIntro && moveApp == null && menuApp == null && !notesOpen }.graphicsLayer {
+                // opening an app: Home zooms in a little and fades; reads the value while drawing, so nothing recomposes
+                val p = launchP.value
+                alpha = (1f - p).coerceIn(0f, 1f)
+                scaleX = 1f + 0.07f * p
+                scaleY = 1f + 0.07f * p
+                compositingStrategy = CompositingStrategy.ModulateAlpha
+            }) {
                 WallpaperLayer(wall)
                 // Soft scrims keep text readable on any wallpaper (stronger on bright pictures)
                 Box(
@@ -513,10 +584,15 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                 when (screen) {
                     Screen.Home -> HomeContent(
                         favApps = favApps,
+                        weather = weather,
                         focusKick = focusKick,
                         nav = nav,
-                        onLaunch = { launchApp(ctx, it) },
+                        movingPkg = dockMove,
+                        onLaunch = { openApp(it) },
                         onAdd = { screen = Screen.Edit },
+                        onMenu = { openMenu(it) },
+                        onMoveTo = { pkg, target, right -> reorderFav(pkg, target, right) },
+                        onMoveDone = { dockMove = null },
                     )
                     Screen.Apps -> if (settings.appsView == AppsView.Folders) {
                         AppFolders(
@@ -526,14 +602,14 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                             focusKick = focusKick,
                             nav = nav,
                             onOpenFolder = { openFolder = it },
-                            onLaunch = { launchApp(ctx, it) },
+                            onLaunch = { openApp(it) },
                             onMove = { moveApp = it },
                         )
                     } else {
-                        AppGrid(apps, false, favPkgs.toSet(), focusKick, nav) { launchApp(ctx, it) }
+                        AppGrid(apps, false, favPkgs.toSet(), focusKick, nav) { openApp(it) }
                     }
                     Screen.Edit -> AppGrid(apps, true, favPkgs.toSet(), focusKick, nav) { toggleFav(it.pkg) }
-                    Screen.Search -> SearchScreen(apps, focusKick, nav) { launchApp(ctx, it) }
+                    Screen.Search -> SearchScreen(apps, focusKick, nav) { openApp(it) }
                     Screen.Settings -> SettingsScreen(
                         settings = settings,
                         focusKick = focusKick,
@@ -621,6 +697,8 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                     onInputs = { openPopup(Popup.Inputs) },
                     onAccount = { openPopup(Popup.Account) },
                     modifier = Modifier.align(Alignment.TopEnd).padding(top = 18.dp, end = 24.dp),
+                    // the big clock widget is the clock now, so the small one steps aside and the bar closes up
+                    showClock = settings.homeWidget != HomeWidget.Clock,
                 )
                 Rail(
                     selected = railSel,
@@ -686,6 +764,22 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                         Popup.None -> {}
                     }
                 }
+            }
+
+            menuApp?.let { a ->
+                AppMenuDialog(
+                    app = a,
+                    isSystem = remember(a.pkg) { isSystemApp(ctx, a.pkg) },
+                    focus = menuFocus,
+                    onInfo = { closeMenu(); openAppInfo(ctx, a.pkg) },
+                    onMove = { menuApp = null; dockMove = a.pkg },
+                    onRemove = { closeMenu(); if (a.pkg in favPkgs) toggleFav(a.pkg) },
+                    onUninstall = { closeMenu(); uninstallApp(ctx, a.pkg) },
+                    onBlockedUninstall = {
+                        Toast.makeText(ctx, "${a.label} is built into the TV, so Android can't uninstall it", Toast.LENGTH_LONG).show()
+                    },
+                    onDismiss = { closeMenu() },
+                )
             }
 
             moveApp?.let { a ->

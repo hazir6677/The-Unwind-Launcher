@@ -67,11 +67,12 @@ import java.util.Locale
 
 /** The tabs along the top of Preferences. */
 enum class PrefTab(val label: String, val w: Dp) {
-    Look("Look", 96.dp),
-    Feel("Sound & motion", 170.dp),
-    Backup("Backup", 110.dp),
-    Updates("Updates", 124.dp),
-    Home("Home setup", 140.dp),
+    Look("Look", 84.dp),
+    Widgets("Home widget", 130.dp),
+    Feel("Sound & motion", 156.dp),
+    Backup("Backup", 96.dp),
+    Updates("Updates", 108.dp),
+    Home("Home setup", 124.dp),
 }
 
 @Composable
@@ -225,6 +226,12 @@ fun FeelTab(settings: LauncherSettings, nav: Nav, rows: PrefRows, onChange: (Lau
     SectionTitle("Bouncy motion", "Icons, cards and pages spring and settle as you move. Turn off for plain, smooth movement.")
     ToggleCard(if (settings.bouncy) "Bouncy motion on" else "Bouncy motion off", settings.bouncy, Modifier.prefItem(rows, nav, 2)) {
         onChange(settings.copy(bouncy = !settings.bouncy))
+    }
+    Spacer(Modifier.height(24.dp))
+
+    SectionTitle("App launch animation", "Home zooms and fades as an app opens, then eases back in when you return.")
+    ToggleCard(if (settings.launchAnim) "Launch animation on" else "Launch animation off", settings.launchAnim, Modifier.prefItem(rows, nav, 3)) {
+        onChange(settings.copy(launchAnim = !settings.launchAnim))
     }
 }
 

@@ -77,7 +77,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
@@ -253,7 +252,7 @@ fun HomeContent(
                             HomeTile(
                                 app,
                                 (if (app != null) Modifier.focusRequester(reqFor(i, app.pkg)) else if (i == 0) Modifier.focusRequester(nav.content) else Modifier)
-                                    .animateItemPlacement(spring(dampingRatio = 0.7f, stiffness = 400f, visibilityThreshold = IntOffset.VisibilityThreshold))
+                                    .animateItemPlacement(spring(dampingRatio = 0.7f, stiffness = 400f))
                                     .dpad(left = if (i == 0) nav.rail else null, up = nav.pill),
                                 lifted = app != null && app.pkg == movingPkg,
                                 onLaunch = onLaunch,

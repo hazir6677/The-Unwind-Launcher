@@ -190,7 +190,7 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     var weatherTick by remember { mutableIntStateOf(0) }
 
     // Focus targets for moving around with the D-pad
-    val railReqs = remember { List(4) { FocusRequester() } }
+    val railReqs = remember { List(3) { FocusRequester() } }
     val pillReq = remember { FocusRequester() }
     val contentReq = remember { FocusRequester() }
 
@@ -536,14 +536,12 @@ fun LauncherApp(tick: Int, homeTick: Int) {
     val ui = remember(settings, wp, backdrops, rootSize) { UiCtx(settings, wp, backdrops, rootSize) }
     val railSel = when (screen) {
         Screen.Home -> 0
-        Screen.Search -> 1
-        Screen.Apps, Screen.Edit -> 2
-        Screen.Settings, Screen.Gallery, Screen.Greeting -> 3
+        Screen.Apps, Screen.Edit -> 1
+        Screen.Settings, Screen.Gallery, Screen.Greeting -> 2
     }
     val nav = Nav(contentReq, pillReq, railReqs[railSel])
     val title = when (screen) {
         Screen.Home -> "Home"
-        Screen.Search -> "Search"
         Screen.Apps -> "Apps"
         Screen.Edit -> "Favorites"
         Screen.Settings, Screen.Gallery, Screen.Greeting -> "Preferences"
@@ -609,7 +607,6 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                         AppGrid(apps, false, favPkgs.toSet(), focusKick, nav) { openApp(it) }
                     }
                     Screen.Edit -> AppGrid(apps, true, favPkgs.toSet(), focusKick, nav) { toggleFav(it.pkg) }
-                    Screen.Search -> SearchScreen(apps, focusKick, nav) { openApp(it) }
                     Screen.Settings -> SettingsScreen(
                         settings = settings,
                         focusKick = focusKick,
@@ -691,7 +688,6 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                 TopPill(
                     acct = acct,
                     nav = nav,
-                    onSearch = { screen = Screen.Search },
                     onSystem = { openSystemSettings(ctx) },
                     onWifi = { openPopup(Popup.Wifi) },
                     onInputs = { openPopup(Popup.Inputs) },
@@ -705,9 +701,8 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                     onClick = { i ->
                         when (i) {
                             0 -> screen = Screen.Home
-                            1 -> screen = Screen.Search
-                            2 -> screen = Screen.Apps
-                            3 -> { prefRestore = false; screen = Screen.Settings }
+                            1 -> screen = Screen.Apps
+                            2 -> { prefRestore = false; screen = Screen.Settings }
                             else -> {}
                         }
                     },
@@ -715,7 +710,7 @@ fun LauncherApp(tick: Int, homeTick: Int) {
                     toContent = contentReq,
                     chip = chipReq,
                     modifier = Modifier.align(Alignment.CenterStart).padding(start = 33.dp, top = 24.dp),
-                    badge = if (updater.hasUpdate) 3 else -1,
+                    badge = if (updater.hasUpdate) 2 else -1,
                 )
             }
 

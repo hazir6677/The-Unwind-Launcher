@@ -39,7 +39,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -328,42 +327,52 @@ fun AppGrid(
     onClick: (AppEntry) -> Unit,
 ) {
     val columns = 7
+    var query by remember { mutableStateOf("") }
+    val results = remember(query, apps) { filterApps(query, apps) }
+    val searchReq = remember { FocusRequester() }
     LaunchedEffect(apps.size, focusKick) {
         delay(200)
         if (apps.isNotEmpty()) runCatching { nav.content.requestFocus() }
     }
     Column(Modifier.fillMaxSize().padding(start = 163.dp, top = 84.dp, end = 40.dp)) {
+        AppSearchField(query, { query = it }, nav, searchReq, noResults = results.isEmpty())
+        Spacer(Modifier.height(10.dp))
         Text(
-            if (editing) "Press OK on an app to add it to Home or remove it." else "Press OK to open an app.",
+            if (query.isNotBlank()) "${results.size} found. Press OK to " + (if (editing) "add or remove." else "open.")
+            else if (editing) "Press OK on an app to add it to Home or remove it." else "Press OK to open an app.",
             color = Color.White.copy(alpha = 0.82f),
             fontSize = 14.sp,
         )
-        Spacer(Modifier.height(12.dp))
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(columns),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 40.dp),
-        ) {
-            itemsIndexed(apps, key = { _, a -> a.pkg }) { i, app ->
-                val isFav = editing && app.pkg in favs
-                Tile(
-                    if (isFav) "\u2713 ${app.label}" else app.label,
-                    (if (i == 0) Modifier.focusRequester(nav.content) else Modifier)
-                        .dpad(
-                            left = if (i % columns == 0) nav.rail else null,
-                            up = if (i < columns) nav.pill else null,
-                        ),
-                    onClick = { onClick(app) },
-                    highlight = isFav,
-                    forceName = true,
-                ) { d -> AppGlyph(app, d) }
+        Spacer(Modifier.height(4.dp))
+        if (results.isEmpty()) {
+            NoAppsFound(query)
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(columns),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 40.dp),
+            ) {
+                itemsIndexed(results, key = { _, a -> a.pkg }) { i, app ->
+                    val isFav = editing && app.pkg in favs
+                    Tile(
+                        if (isFav) "\u2713 ${app.label}" else app.label,
+                        (if (i == 0) Modifier.focusRequester(nav.content) else Modifier)
+                            .dpad(
+                                left = if (i % columns == 0) nav.rail else null,
+                                up = if (i < columns) searchReq else null,
+                            ),
+                        onClick = { onClick(app) },
+                        highlight = isFav,
+                        forceName = true,
+                    ) { d -> AppGlyph(app, d) }
+                }
             }
         }
     }
 }
 
-// ---------- In-launcher app search ----------
+// ---------- Key cap (used by the greeting editor) and app search ----------
 
 @Composable
 fun KeyCap(label: String, w: Dp, modifier: Modifier, active: Boolean = false, onClick: () -> Unit) {
@@ -389,51 +398,47 @@ fun KeyCap(label: String, w: Dp, modifier: Modifier, active: Boolean = false, on
     }
 }
 
+/** Case-insensitive match on the app name; names that start with the text come first. */
+fun filterApps(query: String, apps: List<AppEntry>): List<AppEntry> {
+    val q = query.trim().lowercase()
+    if (q.isEmpty()) return apps
+    return apps.filter { it.label.lowercase().contains(q) }
+        .sortedBy { if (it.label.lowercase().startsWith(q)) 0 else 1 }
+}
+
+/**
+ * The search bar at the top of the All apps and Favorites pages. It uses Android's own keyboard:
+ * press OK on it to type, then Search/Done or Back to come out. Down goes to the first app.
+ * [noResults]: nothing is on the grid, so the bar takes the page's main focus spot (the dock's Right key lands here).
+ */
 @Composable
-fun SearchScreen(apps: List<AppEntry>, focusKick: Int, nav: Nav, onLaunch: (AppEntry) -> Unit) {
-    var query by remember { mutableStateOf("") }
-    LaunchedEffect(focusKick) {
-        delay(200)
-        runCatching { nav.content.requestFocus() }
-    }
-    val results = remember(query, apps) {
-        val q = query.trim().lowercase()
-        if (q.isEmpty()) apps
-        else apps.filter { it.label.lowercase().contains(q) }
-            .sortedBy { if (it.label.lowercase().startsWith(q)) 0 else 1 }
-    }
-    Column(Modifier.fillMaxSize().padding(start = 150.dp, top = 84.dp, end = 24.dp)) {
-        // Android's own keyboard: press OK on the box to type, Search/Done or Back to come out
-        SystemTextField(
-            value = query,
-            onValueChange = { query = it },
-            hint = "Search your apps. Press OK to type.",
-            modifier = Modifier.width(520.dp).focusRequester(nav.content).dpad(left = nav.rail, up = nav.pill),
-        )
-        Spacer(Modifier.height(8.dp))
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val cols = maxOf(1, ((maxWidth + 12.dp) / (86.dp + 12.dp)).toInt())
-            if (results.isEmpty()) {
-                Text("No apps match \"${query.trim()}\"", color = Color.White.copy(alpha = 0.8f), fontSize = 15.sp, modifier = Modifier.padding(top = 12.dp))
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(cols),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
-                ) {
-                    itemsIndexed(results, key = { _, a -> a.pkg }) { i, app ->
-                        Tile(
-                            app.label,
-                            Modifier.dpad(left = if (i % cols == 0) nav.rail else null),
-                            onClick = { onLaunch(app) },
-                            forceName = true,
-                        ) { d -> AppGlyph(app, d) }
-                    }
-                }
-            }
-        }
-    }
+fun AppSearchField(
+    query: String,
+    onQuery: (String) -> Unit,
+    nav: Nav,
+    req: FocusRequester,
+    noResults: Boolean,
+) {
+    SystemTextField(
+        value = query,
+        onValueChange = onQuery,
+        hint = "Search apps. Press OK to type.",
+        modifier = Modifier
+            .width(520.dp)
+            .focusRequester(req)
+            .then(if (noResults) Modifier.focusRequester(nav.content) else Modifier)
+            .dpad(left = nav.rail, up = nav.pill, down = if (noResults) null else nav.content),
+    )
+}
+
+@Composable
+fun NoAppsFound(query: String) {
+    Text(
+        "No apps match \"${query.trim()}\"",
+        color = Color.White.copy(alpha = 0.8f),
+        fontSize = 15.sp,
+        modifier = Modifier.padding(top = 16.dp),
+    )
 }
 
 // ---------- Shared bits for the settings pages ----------

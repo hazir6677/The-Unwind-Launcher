@@ -141,6 +141,10 @@ fun AppFolders(
     onLaunch: (AppEntry) -> Unit,
     onMove: (AppEntry) -> Unit,
 ) {
+    var query by remember { mutableStateOf("") }
+    val searching = query.isNotBlank()
+    val results = remember(query, apps) { filterApps(query, apps) }
+    val searchReq = remember { FocusRequester() }
     val groups = FOLDER_ORDER.map { f -> f to apps.filter { (folderMap[it.pkg] ?: it.folder) == f } }
         .filter { it.second.isNotEmpty() }
     val current = groups.firstOrNull { it.first == openFolder }
@@ -155,7 +159,38 @@ fun AppFolders(
     }
 
     Column(Modifier.fillMaxSize().padding(start = 163.dp, top = 84.dp, end = 40.dp)) {
-        if (current == null) {
+        AppSearchField(query, { query = it }, nav, searchReq, noResults = searching && results.isEmpty())
+        Spacer(Modifier.height(10.dp))
+        if (searching) {
+            // typing searches every app, whichever folder it is in
+            Text("${results.size} found. Press OK to open, hold OK to move to a folder.", color = Color.White.copy(alpha = 0.82f), fontSize = 14.sp)
+            Spacer(Modifier.height(4.dp))
+            if (results.isEmpty()) {
+                NoAppsFound(query)
+            } else {
+                val columns = 7
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(columns),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(top = 16.dp, bottom = 40.dp),
+                ) {
+                    itemsIndexed(results, key = { _, a -> a.pkg }) { i, app ->
+                        Tile(
+                            app.label,
+                            (if (i == 0) Modifier.focusRequester(nav.content) else Modifier)
+                                .dpad(
+                                    left = if (i % columns == 0) nav.rail else null,
+                                    up = if (i < columns) searchReq else null,
+                                ),
+                            onClick = { onLaunch(app) },
+                            forceName = true,
+                            onLongPress = { onMove(app) },
+                        ) { d -> AppGlyph(app, d) }
+                    }
+                }
+            }
+        } else if (current == null) {
             Text("Press OK to open a folder.", color = Color.White.copy(alpha = 0.82f), fontSize = 14.sp)
             Spacer(Modifier.height(12.dp))
             val columns = 6
@@ -172,7 +207,7 @@ fun AppFolders(
                         (if (i == 0) Modifier.focusRequester(nav.content) else Modifier)
                             .dpad(
                                 left = if (i % columns == 0) nav.rail else null,
-                                up = if (i < columns) nav.pill else null,
+                                up = if (i < columns) searchReq else null,
                             ),
                     ) { onOpenFolder(g.first) }
                 }
@@ -200,7 +235,7 @@ fun AppFolders(
                         (if (i == 0) Modifier.focusRequester(nav.content) else Modifier)
                             .dpad(
                                 left = if (i % columns == 0) nav.rail else null,
-                                up = if (i < columns) nav.pill else null,
+                                up = if (i < columns) searchReq else null,
                             ),
                         onClick = { onLaunch(app) },
                         forceName = true,

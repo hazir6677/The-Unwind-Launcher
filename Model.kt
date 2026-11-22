@@ -116,7 +116,7 @@ enum class SoundVolume(val label: String, val gain: Float) {
 /** Where the wallpaper comes from. */
 enum class WallSource { Stock, Bing, Custom }
 
-enum class Screen { Home, Apps, Edit, Search, Settings, Gallery, Greeting }
+enum class Screen { Home, Apps, Edit, Settings, Gallery, Greeting }
 enum class Popup { None, Wifi, Inputs, Account, Weather }
 
 private val HexShape: Shape = GenericShape { size, _ ->
@@ -300,7 +300,7 @@ private const val GREET_SEP = "\u001F"
 /** Focus targets used to wire up D-pad navigation between the dock, top bar and the page content. */
 class Nav(
     val content: FocusRequester, // the first thing on the current page
-    val pill: FocusRequester,    // the top-right bar (search button)
+    val pill: FocusRequester,    // the top-right bar (its first button)
     val rail: FocusRequester,    // the dock button for the current page
 )
 

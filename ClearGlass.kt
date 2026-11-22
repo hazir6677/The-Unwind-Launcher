@@ -166,10 +166,9 @@ private fun backdropShader(bmp: android.graphics.Bitmap, sx: Float, sy: Float, z
 }
 
 /**
- * The Clear panel: the wallpaper behind it, a faint tint, a lens-like edge (the wallpaper is pulled
- * in a little more toward the border, in two steps), a thin bright rim, a soft sheen and a hint of
+ * The Clear panel: the wallpaper behind it, a faint tint, a soft sheen and a hint of
  * depth below. On focus the rim brightens and the focus ring swells in with the shared spring.
- * [overlayOnly]: draw just the edge light and leave the middle clear (small controls on other UI).
+ * [overlayOnly]: draw nothing but the focus ring (small controls on other UI).
  */
 @Composable
 internal fun Modifier.clearGlass(
@@ -201,19 +200,8 @@ internal fun Modifier.clearGlass(
             val dir = layoutDirection
             val path = shape.createOutline(size, dir, this).asPath()
             val ring = insetPath(shape, size, 1.25.dp.toPx(), dir, this)
-            val edge = (min(w, h) * LG.EDGE_FRACTION).coerceIn(LG.EDGE_MIN_DP.dp.toPx(), LG.EDGE_MAX_DP.dp.toPx())
-            val bandOuter = insetPath(shape, size, edge * 0.25f, dir, this)
-            val bandInner = insetPath(shape, size, edge * 0.75f, dir, this)
-            val bandStroke = Stroke(width = edge * 0.5f)
             val rimStroke = Stroke(width = LG.RIM_WIDTH_DP.dp.toPx())
             val focusStroke = Stroke(width = 2.5.dp.toPx())
-            val rimBrush = Brush.linearGradient(
-                0f to Color.White.copy(alpha = 0.80f),
-                0.5f to Color.White.copy(alpha = 0.16f),
-                1f to Color.White.copy(alpha = 0.55f),
-                start = Offset.Zero,
-                end = Offset(w, h),
-            )
             val sheen = Brush.verticalGradient(
                 0f to Color.White.copy(alpha = LG.SHEEN_ALPHA),
                 0.45f to Color.Transparent,
@@ -254,14 +242,11 @@ internal fun Modifier.clearGlass(
                                 drawPath(path, (if (ch.scrimIsDark) Color.Black else Color.White).copy(alpha = ch.scrim))
                             }
                         }
-                        // the lens edge: the wallpaper pulled in slightly more toward the border
-                        drawPath(bandOuter, backdropShader(bd.bitmap, sx, sy, LG.EDGE_ZOOM_OUTER, cx, cy, ox, oy), style = bandStroke)
-                        drawPath(bandInner, backdropShader(bd.bitmap, sx, sy, LG.EDGE_ZOOM_INNER, cx, cy, ox, oy), style = bandStroke)
                         drawPath(path, sheen)
                     }
-                    drawPath(ring, rimBrush, style = rimStroke)
+                    // no outline and no edge band: the panel simply ends where the glass ends
                     // on the dock, icons get a darker, more solid body so they separate from the bar
-                    if (onDock) drawPath(ring, dockBody)
+                    if (onDock) drawPath(path, dockBody)
                 }
                 if (p > 0.02f) {
                     drawPath(

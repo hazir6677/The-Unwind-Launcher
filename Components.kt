@@ -54,7 +54,6 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Input
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SettingsInputComponent
 import androidx.compose.material.icons.rounded.SettingsInputComposite
@@ -354,7 +353,7 @@ fun Rail(
 ) {
     val ui = LocalUi.current
     val btnShape = ui.settings.shape.toShape()
-    val icons = listOf(Icons.Rounded.Home, Icons.Rounded.Search, Icons.Rounded.Apps, Icons.Rounded.Tune)
+    val icons = listOf(Icons.Rounded.Home, Icons.Rounded.Apps, Icons.Rounded.Tune)
     val btn = 54.dp
     val gap = 10.dp
     val padV = 12.dp
@@ -419,7 +418,6 @@ fun Rail(
 fun TopPill(
     acct: AcctState?,
     nav: Nav,
-    onSearch: () -> Unit,
     onSystem: () -> Unit,
     onWifi: () -> Unit,
     onInputs: () -> Unit,
@@ -445,8 +443,7 @@ fun TopPill(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        FocusButton(Icons.Rounded.Search, 34.dp, btn, modifier = Modifier.focusRequester(nav.pill).then(down), onClick = onSearch)
-        FocusButton(Icons.Rounded.Settings, 34.dp, btn, modifier = down, onClick = onSystem)
+        FocusButton(Icons.Rounded.Settings, 34.dp, btn, modifier = Modifier.focusRequester(nav.pill).then(down), onClick = onSystem)
         FocusButton(Icons.Rounded.Wifi, 34.dp, btn, modifier = down, onClick = onWifi)
         FocusButton(Icons.Rounded.SettingsInputHdmi, 34.dp, btn, modifier = down, onClick = onInputs)
         if (showClock) Text(time, color = inkFg(), fontSize = 15.sp, modifier = Modifier.padding(horizontal = 6.dp))

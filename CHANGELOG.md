@@ -19,6 +19,14 @@ This one file feeds three places, so nothing is written twice: the What's New po
 - Weather and Date widgets, or Nothing for a clean, minimal home.
 - Every widget is see-through. No panels, just thin type on your wallpaper.
 
+### One place for apps
+- Search now lives at the top of the All apps page (and the Favorites picker). Press OK on the bar to type with the TV's own keyboard; the list filters as you type. In folder view, typing searches every folder at once.
+- The separate Search page and its dock button are gone, so the dock has three buttons: Home, Apps, Preferences.
+- The search button in the top-right bar is gone too. The bar now starts with the gear.
+
+### Cleaner Clear style
+- Clear panels no longer have a bright outline or the ring-like edge band. They just end where the glass ends. The focus ring still shows on whatever you have selected.
+
 ### Smoother app opening
 - Home zooms in a little and fades as an app opens, then eases back when you return. One switch in Sound & motion turns it off.
 

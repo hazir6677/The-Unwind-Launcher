@@ -63,13 +63,13 @@ For wallpapers you can use one of the six that come with it, the daily wallpaper
 
 App icons get recolored to match the wallpaper. The logo is pulled off its background at high resolution and tinted. If an icon can't be separated cleanly, it shows up as a two-tone chip so it still fits in. You can switch to Original if you'd rather have the full-color icons. Icon shapes are Circle, Squircle, Rounded and Hexagon, and the bars and panels take their corners from the shape you pick. You can also hide the app names on Home.
 
-The top-left corner always tells you where you are (Home, Search, Apps, Favorites or Preferences), with a small weather chip right below it.
+The top-left corner always tells you where you are (Home, Apps, Favorites or Preferences), with a small weather chip right below it.
 
 Day to day:
 
 - Home has a row of pinned apps, plus an Add apps tile for choosing them.
 - The All apps page includes sideloaded phone apps like Google Photos, which most TV launchers hide. In Preferences you can switch it to folders (Video, Music, Games and so on, sorted by each app's category). Hold OK on an app inside a folder to move it somewhere else.
-- Search uses the TV's on-screen keyboard to filter your installed apps as you type.
+- The search bar at the top of All apps uses the TV's on-screen keyboard to filter your installed apps as you type.
 - The weather chip opens current conditions and a 5-day outlook from [Open-Meteo](https://open-meteo.com/). It finds your city automatically or lets you search for one, and switches between Celsius and Fahrenheit.
 - The top bar has system settings, a list of every nearby Wi-Fi network (with signal strength and band), TV inputs, the clock, and your Google account.
 - The D-pad moves between the dock, the weather chip, the top bar and your apps, in both directions.
@@ -101,11 +101,11 @@ To undo it, uninstall Unwind: `adb uninstall com.unwind.launcher`
 
 ## Finding your way around
 
-The dock on the left has four buttons: house for Home, magnifier for search, grid for all apps, sliders for Preferences.
+The dock on the left has three buttons: house for Home, grid for all apps (with the search bar on top), sliders for Preferences.
 
 Above the dock sits the page title and the weather chip. Press OK on the weather chip for the 5-day forecast, city search and temperature units.
 
-The pill in the top right has the same search shortcut, a gear for Android system settings, Wi-Fi (the connected network is highlighted), an HDMI icon for switching inputs, the clock, and an avatar showing which Google account is signed in.
+The pill in the top right has a gear for Android system settings, Wi-Fi (the connected network is highlighted), an HDMI icon for switching inputs, the clock, and an avatar showing which Google account is signed in.
 
 ## Preferences
 

@@ -6,25 +6,25 @@ I wanted a TV home screen that felt like it belonged in a quiet room, so I built
 
 I made it on a 55-inch Xiaomi TV and that is where it's been tested most.
 
-| Liquid Glass | Normal |
+| Clear | Tinted |
 |---|---|
-| <img src="shot_home_liquid_green.png" alt="Liquid Glass, green wallpaper"> | <img src="shot_home_normal_green.png" alt="Normal glass, green wallpaper"> |
+| <img src="fastlane/metadata/android/en-US/images/tvScreenshots/01_home_clear.jpg" alt="Clear glass, green wallpaper"> | <img src="fastlane/metadata/android/en-US/images/tvScreenshots/02_home_tinted.jpg" alt="Tinted glass, green wallpaper"> |
 
-| Liquid Glass, amber wallpaper | Preferences |
+| Clear, amber wallpaper | Preferences |
 |---|---|
-| <img src="shot_home_liquid_amber.png" alt="Liquid Glass, amber wallpaper"> | <img src="shot_preferences.png" alt="Preferences"> |
+| <img src="fastlane/metadata/android/en-US/images/tvScreenshots/03_home_clear_amber.jpg" alt="Clear glass, amber wallpaper"> | <img src="fastlane/metadata/android/en-US/images/tvScreenshots/07_preferences.jpg" alt="Preferences"> |
 
 | Home with weather | App folders |
 |---|---|
-| <img src="Tinted%20homescreen%20with%20weather.png" alt="Home screen with the weather chip"> | <img src="App%20folders%20in%20the%20app%20drawer.png" alt="App folders in the app drawer"> |
+| <img src="fastlane/metadata/android/en-US/images/tvScreenshots/04_home_weather.jpg" alt="Home screen with the weather chip"> | <img src="fastlane/metadata/android/en-US/images/tvScreenshots/05_app_folders.jpg" alt="App folders in the app drawer"> |
 
 | Color themes in Preferences |
 |---|
-| <img src="Launcher%20prefernces%20page%20with%20color%20theme%20styles.png" alt="Preferences page with color theme styles"> |
+| <img src="fastlane/metadata/android/en-US/images/tvScreenshots/06_color_themes.jpg" alt="Preferences page with color theme styles"> |
 
 ## What it does
 
-- **Three glass styles.** Liquid Glass, Normal and Frost.
+- **Three glass styles.** Clear, Tinted and Frosted.
 - **Wallpaper-driven colors.** Pick one of six built-in wallpapers, the daily wallpaper, or a photo of your own. The palette comes from the image, in Soft, Vivid or Mixed.
 - **Weather.** Current conditions and a five-day forecast. It finds your location on its own, or you can pick a city.
 - **App drawer.** An alphabetical grid, or automatic folders (Video, Music, Games and so on). It also shows apps most TV launchers hide, like sideloaded phone apps.
@@ -32,20 +32,30 @@ I made it on a 55-inch Xiaomi TV and that is where it's been tested most.
 - **Your own greetings** for morning, afternoon, evening and night.
 - **Made for a remote.** D-pad focus everywhere, and search uses the TV's own keyboard.
 
-## Liquid Glass
+## Glass styles
 
-Each piece of glass bends the wallpaper behind it at the edges, the way a thick pane would. There's a thin bright rim, a faint color split along the edge, and a soft shadow underneath. Text and icons check the wallpaper behind them and switch between light and dark so they stay readable on any image.
+- **Clear:** see-through glass over a lightly blurred slice of your wallpaper, with a soft shadow underneath.
+- **Tinted:** a blurred panel tinted with the wallpaper's colors.
+- **Frosted:** a heavier, milkier blur.
 
-Normal and Frost are simpler: a blurred, tinted panel, and a heavier, milkier one.
-
-Liquid Glass is drawn on the CPU, so a very busy page can take a moment to fill in the first time you see it. Baking runs on background threads so the interface stays responsive in the meantime.
+Text and icons check the wallpaper behind them and switch between light and dark so they stay readable on any image.
 
 ## Install
+
+There are two versions of Unwind. They look and work the same, and only differ in how they update.
+
+**F-Droid version** (once it's listed): search for Unwind Launcher in the F-Droid app, or open
+[f-droid.org/packages/com.unwind.launcher](https://f-droid.org/packages/com.unwind.launcher/).
+Updates come through F-Droid. In Unwind, Preferences > About checks F-Droid for a newer version and opens its page. This version has no installer inside it.
+
+**GitHub version:**
 
 1. Download the latest APK from [Releases](../../releases).
 2. Sideload it onto your TV.
 
-New builds install over old ones and keep your settings. The APK is signed with a personal key kept in GitHub Secrets. It's fine for sideloading, not for the Play Store.
+This version updates itself: Preferences > About checks GitHub, downloads the new APK and installs it. Android asks you once to allow installs from Unwind.
+
+The two versions are signed with different keys (yours on GitHub, F-Droid's on F-Droid), so Android won't let one install over the other. To switch, uninstall first. You can save your settings under Preferences > Backup before you do.
 
 ### Making it your Home screen
 
@@ -74,7 +84,7 @@ adb uninstall com.unwind.launcher
 |---|---|
 | Wallpaper | Daily wallpaper, your photo, six built-in |
 | Palette | Soft, Vivid, Mixed |
-| Glass | Liquid, Normal, Frost |
+| Glass | Clear, Tinted, Frosted |
 | Icon shape | Circle, Squircle, Rounded, Hexagon |
 | Icon colors | Themed or original |
 | Home layout | Endless row or stacked rows |
@@ -87,12 +97,13 @@ Your own wallpaper is copied into the launcher and scaled to the TV's resolution
 
 ## Permissions and privacy
 
-- **Internet:** daily wallpaper, weather (Open-Meteo, no key or account) and city lookup.
+- **Internet:** daily wallpaper (Bing), weather ([Open-Meteo](https://open-meteo.com/), no key or account), city lookup, release notes from GitHub for What's New, and the update check (against F-Droid in the F-Droid version, GitHub releases in the GitHub version).
 - **Location and Wi-Fi state:** local weather and the nearby networks list. Android requires location access to scan for Wi-Fi.
 - **Pictures and storage:** choosing a wallpaper from your TV.
-- **Accounts and contacts:** showing your Google account name and photo.
+- **Uninstall apps:** the Uninstall item in the long-press menu hands the app to Android's own uninstall screen.
+- **Install unknown apps (GitHub version only):** lets Unwind install its own updates. The F-Droid version doesn't ask for this.
 
-Weather uses the TV's last known location, with an IP-based fallback. Nothing is stored on a server or tracked by Unwind. The daily wallpaper and weather refresh when the launcher opens, then every 30 minutes.
+Weather uses the TV's last known location, with an IP-based fallback. Nothing is stored on a server or tracked by Unwind. There are no ads, analytics or crash reporters, and no Google services. The daily wallpaper and weather refresh when the launcher opens, then every 30 minutes.
 
 ## Built with
 
@@ -123,3 +134,5 @@ Reordering pinned apps, custom folders you can name, more glass and icon styles,
 [MIT](LICENSE)
 
 Built with love, and some coding here and there by Hazir from 🇮🇳
+
+The six built-in wallpapers are AI-generated.

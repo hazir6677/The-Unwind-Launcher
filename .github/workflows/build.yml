@@ -9,23 +9,6 @@ jobs:
       contents: write   # lets the build attach the APK to a release
     steps:
       - uses: actions/checkout@v4
-      - name: Arrange files
-        run: |
-          J=app/src/main/java/com/unwind/launcher
-          R=app/src/main/res
-          mkdir -p $J $R/values $R/drawable $R/drawable-nodpi
-          for f in *.kt; do if [ -f "$f" ]; then mv "$f" $J/; fi; done
-          for f in wp_*.jpg; do if [ -f "$f" ]; then mv "$f" $R/drawable-nodpi/; fi; done
-          for f in unwind_icon.png unwind_banner.png; do if [ -f "$f" ]; then mv "$f" $R/drawable-nodpi/; fi; done
-          if [ -f AndroidManifest.xml ]; then mv AndroidManifest.xml app/src/main/; fi
-          if [ -f app-build.gradle.kts ]; then mv app-build.gradle.kts app/build.gradle.kts; fi
-          if [ -f proguard-rules.pro ]; then mv proguard-rules.pro app/proguard-rules.pro; fi
-          if [ -f strings.xml ]; then mv strings.xml $R/values/; fi
-          if [ -f themes.xml ]; then mv themes.xml $R/values/; fi
-          # the one changelog feeds the What's New pop-up in the app and the GitHub release text
-          mkdir -p app/src/main/assets
-          if [ -f CHANGELOG.md ]; then cp CHANGELOG.md app/src/main/assets/changelog.md; fi
-          ls -R app | head -80
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -34,9 +17,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.7
-      - name: Version from release tag
+      - name: Check the tag matches versionName
         if: startsWith(github.ref, 'refs/tags/v')
-        run: echo "UNWIND_VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+        run: |
+          V=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          if [ "v$V" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match versionName $V in app/build.gradle.kts"
+            exit 1
+          fi
       - name: Restore signing key
         env:
           KEYSTORE_B64: ${{ secrets.UNWIND_KEYSTORE_B64 }}
@@ -48,33 +36,35 @@ jobs:
             echo "::warning::No signing key secret found. This APK will NOT install over an older one."
           fi
       - name: Build debug APK
-        run: gradle assembleDebug --no-daemon
+        run: gradle assembleGithubDebug --no-daemon
         env:
           UNWIND_KEYSTORE_PASSWORD: ${{ secrets.UNWIND_KEYSTORE_PASSWORD }}
           UNWIND_KEY_ALIAS: ${{ secrets.UNWIND_KEY_ALIAS }}
           UNWIND_KEY_PASSWORD: ${{ secrets.UNWIND_KEY_PASSWORD }}
       - name: Build release APK (smoother)
-        run: gradle assembleRelease --no-daemon
+        run: gradle assembleGithubRelease --no-daemon
         continue-on-error: true
         env:
           UNWIND_KEYSTORE_PASSWORD: ${{ secrets.UNWIND_KEYSTORE_PASSWORD }}
           UNWIND_KEY_ALIAS: ${{ secrets.UNWIND_KEY_ALIAS }}
           UNWIND_KEY_PASSWORD: ${{ secrets.UNWIND_KEY_PASSWORD }}
+      - name: Check that the F-Droid version builds too
+        run: gradle assembleFdroidRelease --no-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: unwind-launcher-apk
           path: |
-            app/build/outputs/apk/release/app-release.apk
-            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/github/release/app-github-release.apk
+            app/build/outputs/apk/github/debug/app-github-debug.apk
           if-no-files-found: warn
       - name: Prepare the release file
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           mkdir -p dist
-          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk "dist/Unwind-${GITHUB_REF_NAME}.apk"
+          if [ -f app/build/outputs/apk/github/release/app-github-release.apk ]; then
+            cp app/build/outputs/apk/github/release/app-github-release.apk "dist/Unwind-${GITHUB_REF_NAME}.apk"
           else
-            cp app/build/outputs/apk/debug/app-debug.apk "dist/Unwind-${GITHUB_REF_NAME}.apk"
+            cp app/build/outputs/apk/github/debug/app-github-debug.apk "dist/Unwind-${GITHUB_REF_NAME}.apk"
           fi
       - name: Release notes from CHANGELOG.md
         if: startsWith(github.ref, 'refs/tags/v')

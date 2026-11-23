@@ -1,0 +1,21 @@
+A calmer home screen for Android TV. Pick a wallpaper and the colors, icons and glass panels follow it. Nothing else on screen is shouting at you.
+
+<b>What it does</b>
+• Three glass styles: Clear, Tinted and Frosted
+• Colors taken from your wallpaper, in Soft, Vivid or Mixed
+• Six built-in wallpapers, the daily wallpaper, or a photo of your own
+• Home widgets: greeting, month calendar, clock, weather or date
+• Weather with a five-day forecast, found automatically or by city
+• App drawer as an alphabetical grid or automatic folders, including sideloaded phone apps
+• Long-press menu on home apps: App info, Move, Remove from Home, Uninstall
+• Home row, stacked rows and an optional glass dock
+• Save and restore your whole setup
+• Made for a remote: D-pad focus everywhere, search with the TV's own keyboard
+
+<b>Privacy</b>
+No ads, no analytics, no accounts and no Google services. Unwind uses the internet only for the daily wallpaper, weather, release notes and checking F-Droid for a newer version. Location is optional and is used for local weather and the Wi-Fi list.
+
+<b>Making it your Home screen</b>
+Press the Home button and choose Unwind. Some TVs lock the Home button to their own launcher; the project page explains how to set Unwind as Home over ADB.
+
+Tested most on a 55-inch Xiaomi TV. Free software under the MIT license.

@@ -1,0 +1,4 @@
+First release on F-Droid.
+The Updates tab is now About. In this version it checks F-Droid for new versions and opens Unwind's F-Droid page.
+Removed the profile button from the top bar, and the account and contacts permissions.
+Added to F-Droid from v2.5: hold OK on a home app for App info, Move, Remove and Uninstall; Home widgets; search inside All apps.

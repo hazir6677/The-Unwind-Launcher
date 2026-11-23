@@ -4,6 +4,15 @@ This one file feeds three places, so nothing is written twice: the What's New po
 (the build copies it into the app), the notes on each GitHub release, and the Updates page. Add a new
 `## vX.Y` section at the top for every version. Lines starting with `###` become small headings.
 
+## v2.5.1
+
+### About tab and F-Droid
+- The Updates tab is now About.
+- Unwind now comes in two versions. The GitHub version still updates itself from GitHub releases. The F-Droid version has no installer inside: its button asks F-Droid whether a newer version is out and opens Unwind's F-Droid page, and it doesn't need the "install unknown apps" permission.
+
+### Less access
+- The profile picture button is gone from the top bar, and Unwind no longer asks for account or contacts access.
+
 ## v2.5
 
 ### Hold OK on an app

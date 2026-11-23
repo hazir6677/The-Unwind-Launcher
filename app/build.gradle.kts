@@ -37,7 +37,7 @@ android {
     }
 
     signingConfigs {
-        if (keystorePath != null && file(keystorePath).exists()) {
+        if (keystorePath != null && file(keystorePath).isFile && !System.getenv("UNWIND_KEYSTORE_PASSWORD").isNullOrEmpty()) {
             create("unwind") {
                 storeFile = file(keystorePath)
                 storePassword = System.getenv("UNWIND_KEYSTORE_PASSWORD")
